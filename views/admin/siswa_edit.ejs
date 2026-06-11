@@ -1,0 +1,28 @@
+<%- include('../partials/header', { title: 'Edit Siswa' }) %>
+<%- include('../partials/sidebar_admin') %>
+
+<h2>Edit Siswa</h2>
+<% if (error) { %><div class="alert alert-danger"><%= error %></div><% } %>
+
+<form action="/admin/siswa/edit/<%= siswa.id %>" method="POST">
+    <div class="mb-3">
+        <label>NIS</label>
+        <input type="text" name="nis" class="form-control" value="<%= siswa.nis %>" required>
+    </div>
+    <div class="mb-3">
+        <label>Nama</label>
+        <input type="text" name="nama" class="form-control" value="<%= siswa.nama %>" required>
+    </div>
+    <div class="mb-3">
+        <label>Kelas</label>
+        <input type="text" name="kelas" class="form-control" value="<%= siswa.kelas %>" required>
+    </div>
+    <div class="mb-3">
+        <label>PIN Ujian</label>
+        <input type="text" name="pin_ujian" class="form-control" value="<%= siswa.pin_ujian %>">
+    </div>
+    <button type="submit" class="btn btn-primary">Update</button>
+    <a href="/admin/siswa" class="btn btn-secondary">Batal</a>
+</form>
+
+<%- include('../partials/footer') %>

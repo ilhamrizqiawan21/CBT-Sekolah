@@ -1,0 +1,137 @@
+<%- include('../partials/header', { title: 'Kelola Soal' }) %>
+<%- include('../partials/sidebar_admin') %>
+
+<div class="container-fluid">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-question-circle"></i> Kelola Soal</h1>
+        <button class="btn btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#tambahSoalModal">
+            <i class="bi bi-plus-circle"></i> Tambah Soal
+        </button>
+    </div>
+
+    <!-- Filter -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 bg-primary text-white">
+            <h6 class="m-0 font-weight-bold"><i class="bi bi-funnel"></i> Filter Data</h6>
+        </div>
+        <div class="card-body">
+            <form method="GET" action="/admin/soal" class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label>Ujian</label>
+                    <select name="ujian" class="form-select">
+                        <option value="">Semua Ujian</option>
+                        <% ujianList.forEach(u => { %>
+                            <option value="<%= u.id %>" <%= filterUjian == u.id ? 'selected' : '' %>><%= u.nama_ujian %></option>
+                        <% }) %>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100"><i class="bi bi-search"></i> Filter</button>
+                </div>
+                <div class="col-md-2">
+                    <a href="/admin/soal" class="btn btn-secondary w-100"><i class="bi bi-arrow-repeat"></i> Reset</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Notifikasi -->
+    <% if (msg) { %><div class="alert alert-success"><%= msg %></div><% } %>
+    <% if (error) { %><div class="alert alert-danger"><%= error %></div><% } %>
+
+    <!-- Tabel Soal -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 bg-primary text-white">
+            <h6 class="m-0 font-weight-bold">Daftar Soal</h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID</th><th>Ujian</th><th>Tipe</th><th>Teks Soal</th><th>Poin</th><th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% soal.forEach(s => { %>
+                        <tr>
+                            <td><%= s.id %></td>
+                            <td><%= s.nama_ujian %></td>
+                            <td><span class="badge <%= s.tipe_soal === 'pg' ? 'bg-primary' : (s.tipe_soal === 'menjodohkan' ? 'bg-success' : 'bg-warning') %>">
+                                <%= s.tipe_soal === 'pg' ? 'Pilihan Ganda' : (s.tipe_soal === 'menjodohkan' ? 'Menjodohkan' : 'Essay') %>
+                            </span></td>
+                            <td><%= s.teks_soal.substring(0, 50) %>...</td>
+                            <td><%= s.poin %></td>
+                            <td>
+                                <a href="/admin/soal/edit/<%= s.id %>" class="btn btn-sm btn-warning"><i class="bi bi-pencil"></i></a>
+                                <a href="/admin/soal/hapus/<%= s.id %>" class="btn btn-sm btn-danger" onclick="return confirm('Yakin hapus soal ini?')"><i class="bi bi-trash"></i></a>
+                             </td>
+                         </tr>
+                        <% }) %>
+                        <% if (soal.length === 0) { %>
+                            <tr><td colspan="6" class="text-center">Belum ada data soal</td></tr>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Pagination -->
+            <% if (totalPages > 1) { %>
+            <nav><ul class="pagination justify-content-center">
+                <li class="page-item <%= currentPage === 1 ? 'disabled' : '' %>"><a class="page-link" href="?page=<%= currentPage-1 %><%= filterUjian ? '&ujian='+filterUjian : '' %>">Prev</a></li>
+                <% for (let i = 1; i <= totalPages; i++) { %>
+                    <li class="page-item <%= i === currentPage ? 'active' : '' %>"><a class="page-link" href="?page=<%= i %><%= filterUjian ? '&ujian='+filterUjian : '' %>"><%= i %></a></li>
+                <% } %>
+                <li class="page-item <%= currentPage === totalPages ? 'disabled' : '' %>"><a class="page-link" href="?page=<%= currentPage+1 %><%= filterUjian ? '&ujian='+filterUjian : '' %>">Next</a></li>
+            </ul></nav>
+            <% } %>
+            <div class="text-muted">Menampilkan <%= soal.length %> dari <%= total %> soal</div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Tambah Soal (Sederhana, bisa dikembangkan) -->
+<div class="modal fade" id="tambahSoalModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form action="/admin/soal/tambah" method="POST">
+                <div class="modal-header bg-primary text-white"><h5>Tambah Soal</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3"><label>Ujian</label><select name="ujian_id" class="form-select" required><% ujianList.forEach(u => { %><option value="<%= u.id %>"><%= u.nama_ujian %></option><% }) %></select></div>
+                        <div class="col-md-3 mb-3"><label>Tipe Soal</label><select name="tipe_soal" id="tipe_soal" class="form-select" required><option value="pg">Pilihan Ganda</option><option value="menjodohkan">Menjodohkan</option><option value="essay">Essay</option></select></div>
+                        <div class="col-md-3 mb-3"><label>Poin</label><input type="number" name="poin" class="form-control" value="1"></div>
+                        <div class="col-12 mb-3"><label>Teks Soal</label><textarea name="teks_soal" class="form-control" rows="3" required></textarea></div>
+                        <div id="form_pg" class="col-12">
+                            <div class="row"><div class="col-md-6 mb-2"><label>Pilihan A</label><input type="text" name="pilihan_a" class="form-control"></div>
+                            <div class="col-md-6 mb-2"><label>Pilihan B</label><input type="text" name="pilihan_b" class="form-control"></div>
+                            <div class="col-md-6 mb-2"><label>Pilihan C</label><input type="text" name="pilihan_c" class="form-control"></div>
+                            <div class="col-md-6 mb-2"><label>Pilihan D</label><input type="text" name="pilihan_d" class="form-control"></div>
+                            <div class="col-12 mb-2"><label>Jawaban Benar (A/B/C/D)</label><input type="text" name="jawaban_benar" class="form-control" maxlength="1"></div></div>
+                        </div>
+                        <div id="form_other" style="display:none" class="col-12">
+                            <div class="mb-3"><label>Jawaban Benar (JSON untuk menjodohkan / kata kunci untuk essay)</label><textarea name="jawaban_benar" class="form-control" rows="2" placeholder='Menjodohkan: [{"kiri":"A","kanan":"Jakarta"}] atau Essay: kata1,kata2'></textarea></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer"><button type="submit" class="btn btn-primary">Simpan</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.getElementById('tipe_soal').addEventListener('change', function() {
+        const formPg = document.getElementById('form_pg');
+        const formOther = document.getElementById('form_other');
+        if (this.value === 'pg') {
+            formPg.style.display = 'block';
+            formOther.style.display = 'none';
+        } else {
+            formPg.style.display = 'none';
+            formOther.style.display = 'block';
+        }
+    });
+</script>
+
+<%- include('../partials/footer') %>

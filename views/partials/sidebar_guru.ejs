@@ -1,0 +1,73 @@
+<!-- ══ SIDEBAR GURU ══ -->
+<nav class="sidebar" id="sidebar">
+    <!-- Brand -->
+    <div class="sidebar-brand">
+        <img src="/images/logo-sekolah.png" alt="Logo" style="width:32px;height:32px;object-fit:contain;flex-shrink:0;">
+        <span class="sidebar-brand-text">CBT Guru</span>
+    </div>
+
+    <!-- Nav -->
+    <ul class="nav flex-column mt-2" style="position:relative;z-index:1;">
+        <li class="nav-item">
+            <a class="nav-link" href="/guru/dashboard" data-tooltip="Dashboard">
+                <i class="bi bi-speedometer2"></i>
+                <span class="nav-text">Dashboard</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="/guru/kelola-soal" data-tooltip="Kelola Soal">
+                <i class="bi bi-pencil-square"></i>
+                <span class="nav-text">Kelola Soal</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="/guru/hasil-siswa" data-tooltip="Hasil Siswa">
+                <i class="bi bi-bar-chart"></i>
+                <span class="nav-text">Hasil Siswa</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="/guru/log-kecurangan" data-tooltip="Log Kecurangan">
+                <i class="bi bi-exclamation-triangle"></i>
+                <span class="nav-text">Log Kecurangan</span>
+            </a>
+        </li>
+
+        <li class="nav-item" style="margin-top:auto;padding-top:1rem;">
+            <hr style="border-color:rgba(255,255,255,.1);margin:.5rem 0;">
+            <a class="nav-link" href="/logout-guru" data-tooltip="Logout"
+               style="color:rgba(255,100,100,.85) !important;">
+                <i class="bi bi-box-arrow-right"></i>
+                <span class="nav-text">Logout</span>
+            </a>
+        </li>
+    </ul>
+</nav>
+<!-- ══ END SIDEBAR GURU ══ -->
+
+<!-- ══ CONTENT WRAPPER ══ -->
+<div id="content-wrapper" class="d-flex flex-column">
+
+    <!-- TOPBAR -->
+    <nav class="navbar topbar">
+        <!-- Toggle button -->
+        <button id="sidebarToggle" class="sidebar-toggle-btn" aria-label="Toggle navigasi" aria-expanded="true">
+            <i class="bi bi-list" id="toggleIcon"></i>
+        </button>
+
+        <span class="topbar-title d-none d-md-inline text-muted" style="font-size:.8rem;font-weight:600;letter-spacing:.04em;"></span>
+
+        <div class="ms-auto d-flex align-items-center gap-2">
+            <% if (typeof session !== 'undefined' && session && session.guruNama) { %>
+            <span class="badge bg-success" style="font-size:.75rem;padding:.4em .8em;">
+                <i class="bi bi-person-circle me-1"></i><%= session.guruNama %>
+            </span>
+            <% } %>
+            <a href="/logout-guru" class="btn btn-sm btn-secondary" title="Logout">
+                <i class="bi bi-box-arrow-right"></i>
+            </a>
+        </div>
+    </nav>
+    <!-- ══ END TOPBAR ══ -->
+
+    <!-- Konten halaman dimulai di sini -->

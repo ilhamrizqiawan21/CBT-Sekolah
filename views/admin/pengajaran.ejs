@@ -1,0 +1,197 @@
+<%- include('../partials/header', { title: 'Kelola Pengajaran' }) %>
+<%- include('../partials/sidebar_admin') %>
+
+<div class="container-fluid">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-journal-bookmark-fill"></i> Kelola Pengajaran</h1>
+        <button class="btn btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#tambahPengajaranModal">
+            <i class="bi bi-plus-circle"></i> Assign Pengajaran
+        </button>
+    </div>
+
+    <!-- Statistik Ringkas -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Total Pengajaran</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800"><%= pengajaran.length %></div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-diagram-3 fs-1 text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notifikasi -->
+    <% if (query && query.msg) { %>
+        <div class="alert alert-success alert-dismissible fade show"><i class="bi bi-check-circle"></i> <%= query.msg %><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+    <% } %>
+    <% if (query && query.error) { %>
+        <div class="alert alert-danger alert-dismissible fade show"><i class="bi bi-exclamation-triangle"></i> <%= query.error %><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+    <% } %>
+
+    <!-- Tabel Data Pengajaran -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 bg-primary text-white">
+            <h6 class="m-0 font-weight-bold">Daftar Relasi Guru - Mapel - Kelas</h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover" id="dataTable" width="100%">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Guru</th><th>Mata Pelajaran</th><th>Kelas</th><th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% if (pengajaran.length > 0) { %>
+                            <% pengajaran.forEach(p => { %>
+                            <tr>
+                                <td><%= p.guru_nama %></td>
+                                <td><%= p.nama_mapel %></td>
+                                <td><%= p.nama_kelas %></td>
+                                <td>
+                                    <button class="btn btn-sm btn-warning btn-edit" 
+                                        data-id="<%= p.id %>"
+                                        data-guru="<%= p.guru_id %>"
+                                        data-mapel="<%= p.mapel_id %>"
+                                        data-kelas="<%= p.kelas_id %>">
+                                        <i class="bi bi-pencil"></i> Edit
+                                    </button>
+                                    <a href="/admin/pengajaran/hapus/<%= p.id %>" class="btn btn-sm btn-danger" onclick="return confirm('Yakin hapus pengajaran ini? Akan menghapus ujian yang terkait jika ada.')">
+                                        <i class="bi bi-trash"></i> Hapus
+                                    </a>
+                                 </td>
+                             </tr>
+                            <% }) %>
+                        <% } else { %>
+                            <tr><td colspan="4" class="text-center">Belum ada data pengajaran</td></tr>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Tambah Pengajaran -->
+<div class="modal fade" id="tambahPengajaranModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="/admin/pengajaran/tambah" method="POST">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="bi bi-plus-circle"></i> Assign Pengajaran</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label>Guru <span class="text-danger">*</span></label>
+                        <select name="guru_id" class="form-select" required>
+                            <option value="">-- Pilih Guru --</option>
+                            <% guru.forEach(g => { %>
+                                <option value="<%= g.id %>"><%= g.nama %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label>Mata Pelajaran <span class="text-danger">*</span></label>
+                        <select name="mapel_id" class="form-select" required>
+                            <option value="">-- Pilih Mata Pelajaran --</option>
+                            <% mapel.forEach(m => { %>
+                                <option value="<%= m.id %>"><%= m.nama_mapel %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label>Kelas <span class="text-danger">*</span></label>
+                        <select name="kelas_id" class="form-select" required>
+                            <option value="">-- Pilih Kelas --</option>
+                            <% kelas.forEach(k => { %>
+                                <option value="<%= k.id %>"><%= k.nama_kelas %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary">Simpan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Edit Pengajaran -->
+<div class="modal fade" id="editPengajaranModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="editPengajaranForm" method="POST">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title"><i class="bi bi-pencil-square"></i> Edit Pengajaran</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="id" id="edit_id">
+                    <div class="mb-3">
+                        <label>Guru</label>
+                        <select name="guru_id" id="edit_guru_id" class="form-select" required>
+                            <option value="">-- Pilih Guru --</option>
+                            <% guru.forEach(g => { %>
+                                <option value="<%= g.id %>"><%= g.nama %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label>Mata Pelajaran</label>
+                        <select name="mapel_id" id="edit_mapel_id" class="form-select" required>
+                            <option value="">-- Pilih Mata Pelajaran --</option>
+                            <% mapel.forEach(m => { %>
+                                <option value="<%= m.id %>"><%= m.nama_mapel %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label>Kelas</label>
+                        <select name="kelas_id" id="edit_kelas_id" class="form-select" required>
+                            <option value="">-- Pilih Kelas --</option>
+                            <% kelas.forEach(k => { %>
+                                <option value="<%= k.id %>"><%= k.nama_kelas %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-warning">Update</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Event listener untuk tombol edit
+    document.querySelectorAll('.btn-edit').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const id = this.dataset.id;
+            const guruId = this.dataset.guru;
+            const mapelId = this.dataset.mapel;
+            const kelasId = this.dataset.kelas;
+            document.getElementById('edit_id').value = id;
+            document.getElementById('edit_guru_id').value = guruId;
+            document.getElementById('edit_mapel_id').value = mapelId;
+            document.getElementById('edit_kelas_id').value = kelasId;
+            const editForm = document.getElementById('editPengajaranForm');
+            editForm.action = `/admin/pengajaran/edit/${id}`;
+            new bootstrap.Modal(document.getElementById('editPengajaranModal')).show();
+        });
+    });
+</script>
+
+<%- include('../partials/footer') %>

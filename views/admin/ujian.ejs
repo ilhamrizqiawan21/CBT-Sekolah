@@ -1,0 +1,158 @@
+<%- include('../partials/header', { title: 'Kelola Ujian' }) %>
+<%- include('../partials/sidebar_admin') %>
+
+<div class="container-fluid">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-calendar-check"></i> Kelola Ujian</h1>
+        <button class="btn btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#tambahUjianModal">
+            <i class="bi bi-plus-circle"></i> Tambah Ujian
+        </button>
+    </div>
+
+    <!-- Statistik Ringkas -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Total Ujian</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800"><%= total %></div>
+                        </div>
+                        <div class="col-auto"><i class="bi bi-calendar fs-1 text-gray-300"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 bg-primary text-white">
+            <h6 class="m-0 font-weight-bold"><i class="bi bi-funnel"></i> Filter Data</h6>
+        </div>
+        <div class="card-body">
+            <form method="GET" action="/admin/ujian" class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label>Mata Pelajaran</label>
+                    <select name="mapel" class="form-select">
+                        <option value="">Semua Mapel</option>
+                        <% mapelList.forEach(m => { %>
+                            <option value="<%= m.id %>" <%= filterMapel == m.id ? 'selected' : '' %>><%= m.nama_mapel %></option>
+                        <% }) %>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label>Kelas</label>
+                    <select name="kelas" class="form-select">
+                        <option value="">Semua Kelas</option>
+                        <% kelasList.forEach(k => { %>
+                            <option value="<%= k.id %>" <%= filterKelas == k.id ? 'selected' : '' %>><%= k.nama_kelas %></option>
+                        <% }) %>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100"><i class="bi bi-search"></i> Filter</button>
+                </div>
+                <div class="col-md-2">
+                    <a href="/admin/ujian" class="btn btn-secondary w-100"><i class="bi bi-arrow-repeat"></i> Reset</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Notifikasi -->
+    <% if (msg) { %>
+        <div class="alert alert-success alert-dismissible fade show"><i class="bi bi-check-circle"></i> <%= msg %><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+    <% } %>
+    <% if (error) { %>
+        <div class="alert alert-danger alert-dismissible fade show"><i class="bi bi-exclamation-triangle"></i> <%= error %><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+    <% } %>
+
+    <!-- Tabel Ujian -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 bg-primary text-white">
+            <h6 class="m-0 font-weight-bold">Daftar Ujian</h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Nama Ujian</th><th>Mapel</th><th>Kelas</th><th>Guru</th>
+                            <th>Durasi</th><th>Mulai</th><th>Selesai</th><th>Pelanggaran</th><th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% if (ujian.length > 0) { %>
+                            <% ujian.forEach(u => { %>
+                                <tr>
+                                    <td><%= u.nama_ujian %></td>
+                                    <td><%= u.nama_mapel %></td>
+                                    <td><%= u.nama_kelas %></td>
+                                    <td><%= u.guru_nama %></td>
+                                    <td><%= u.durasi %> menit</td>
+                                    <td><%= new Date(u.tanggal_mulai).toLocaleString() %></td>
+                                    <td><%= new Date(u.tanggal_selesai).toLocaleString() %></td>
+                                    <td><span class="badge bg-warning"><%= u.batas_pelanggaran %>x</span></td>
+                                    <td>
+                                        <a href="/admin/ujian/edit/<%= u.id %>" class="btn btn-sm btn-warning"><i class="bi bi-pencil"></i></a>
+                                        <a href="/admin/ujian/hapus/<%= u.id %>" class="btn btn-sm btn-danger" onclick="return confirm('Hapus ujian? Semua soal & jawaban akan terhapus.')"><i class="bi bi-trash"></i></a>
+                                    </td>
+                                </tr>
+                            <% }) %>
+                        <% } else { %>
+                            <tr><td colspan="9" class="text-center">Belum ada data ujian</td></tr>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <% if (totalPages > 1) { %>
+            <nav aria-label="Page navigation" class="mt-4">
+                <ul class="pagination justify-content-center">
+                    <li class="page-item <%= currentPage === 1 ? 'disabled' : '' %>">
+                        <a class="page-link" href="?page=<%= currentPage-1 %><%= filterMapel ? '&mapel='+filterMapel : '' %><%= filterKelas ? '&kelas='+filterKelas : '' %>">Previous</a>
+                    </li>
+                    <% for (let i = 1; i <= totalPages; i++) { %>
+                        <li class="page-item <%= i === currentPage ? 'active' : '' %>">
+                            <a class="page-link" href="?page=<%= i %><%= filterMapel ? '&mapel='+filterMapel : '' %><%= filterKelas ? '&kelas='+filterKelas : '' %>"><%= i %></a>
+                        </li>
+                    <% } %>
+                    <li class="page-item <%= currentPage === totalPages ? 'disabled' : '' %>">
+                        <a class="page-link" href="?page=<%= currentPage+1 %><%= filterMapel ? '&mapel='+filterMapel : '' %><%= filterKelas ? '&kelas='+filterKelas : '' %>">Next</a>
+                    </li>
+                </ul>
+            </nav>
+            <% } %>
+            <div class="text-muted mt-2">Menampilkan <%= ujian.length %> dari total <%= total %> ujian</div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Tambah Ujian -->
+<div class="modal fade" id="tambahUjianModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form action="/admin/ujian/tambah" method="POST">
+                <div class="modal-header bg-primary text-white"><h5 class="modal-title"><i class="bi bi-plus-circle"></i> Tambah Ujian</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3"><label>Pengajaran *</label><select name="pengajaran_id" class="form-select" required><% pengajaran.forEach(p => { %><option value="<%= p.id %>"><%= p.nama_mapel %> - <%= p.nama_kelas %> ( <%= p.guru_nama %> )</option><% }) %></select></div>
+                        <div class="col-md-6 mb-3"><label>Nama Ujian *</label><input type="text" name="nama_ujian" class="form-control" required></div>
+                        <div class="col-md-3 mb-3"><label>Durasi (menit) *</label><input type="number" name="durasi" class="form-control" value="60" required></div>
+                        <div class="col-md-3 mb-3"><label>Batas Pelanggaran *</label><input type="number" name="batas_pelanggaran" class="form-control" value="3" min="1" required></div>
+                        <div class="col-md-3 mb-3"><label>Acak Soal</label><select name="acak_soal" class="form-select"><option value="1">Ya</option><option value="0">Tidak</option></select></div>
+                        <div class="col-md-3 mb-3"><label>Acak Pilihan</label><select name="acak_pilihan" class="form-select"><option value="1">Ya</option><option value="0">Tidak</option></select></div>
+                        <div class="col-md-6 mb-3"><label>Tanggal Mulai *</label><input type="datetime-local" name="tanggal_mulai" class="form-control" required></div>
+                        <div class="col-md-6 mb-3"><label>Tanggal Selesai *</label><input type="datetime-local" name="tanggal_selesai" class="form-control" required></div>
+                    </div>
+                </div>
+                <div class="modal-footer"><button type="submit" class="btn btn-primary">Simpan</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<%- include('../partials/footer') %>

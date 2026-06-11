@@ -1,0 +1,170 @@
+<%- include('../partials/header', { title: 'Kelola Guru' }) %>
+<%- include('../partials/sidebar_admin') %>
+
+<div class="container-fluid">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-people"></i> Kelola Guru</h1>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#tambahGuruModal">
+            <i class="bi bi-plus-lg"></i> Tambah Guru
+        </button>
+    </div>
+
+    <!-- Statistik kecil -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Total Guru</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800"><%= guru.length %></div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-person-badge fs-2 text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabel Data Guru -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Daftar Guru</h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover" id="dataTable" width="100%" cellspacing="0">
+                    <thead>
+                        <tr>
+                            <th>NIP</th>
+                            <th>Nama</th>
+                            <th>Username</th>
+                            <th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% guru.forEach(g => { %>
+                        <tr>
+                            <td><%= g.nip %></td>
+                            <td><%= g.nama %></td>
+                            <td><%= g.username %></td>
+                            <td>
+                                <button class="btn btn-sm btn-warning btn-edit" 
+                                    data-id="<%= g.id %>"
+                                    data-nip="<%= g.nip %>"
+                                    data-nama="<%= g.nama %>"
+                                    data-username="<%= g.username %>">
+                                    <i class="bi bi-pencil"></i> Edit
+                                </button>
+                                <a href="/admin/guru/hapus/<%= g.id %>" class="btn btn-sm btn-danger" onclick="return confirm('Yakin hapus guru ini?')">
+                                    <i class="bi bi-trash"></i> Hapus
+                                </a>
+                            </td>
+                        </tr>
+                        <% }) %>
+                        <% if (guru.length === 0) { %>
+                        <tr><td colspan="4" class="text-center">Belum ada data guru</td></tr>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Tambah Guru -->
+<div class="modal fade" id="tambahGuruModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="/admin/guru/tambah" method="POST">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">Tambah Guru</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label>NIP</label>
+                        <input type="text" name="nip" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label>Nama Lengkap</label>
+                        <input type="text" name="nama" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label>Username</label>
+                        <input type="text" name="username" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label>Password</label>
+                        <input type="password" name="password" class="form-control" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary">Simpan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Edit Guru -->
+<div class="modal fade" id="editGuruModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="editGuruForm" method="POST">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title">Edit Guru</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="id" id="edit_id">
+                    <div class="mb-3">
+                        <label>NIP</label>
+                        <input type="text" name="nip" id="edit_nip" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label>Nama Lengkap</label>
+                        <input type="text" name="nama" id="edit_nama" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label>Username</label>
+                        <input type="text" name="username" id="edit_username" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label>Password (kosongkan jika tidak diubah)</label>
+                        <input type="password" name="password" id="edit_password" class="form-control" placeholder="Biarkan kosong jika tidak ingin mengganti password">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-warning">Update</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Event listener untuk tombol edit
+    document.querySelectorAll('.btn-edit').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const id = this.dataset.id;
+            const nip = this.dataset.nip;
+            const nama = this.dataset.nama;
+            const username = this.dataset.username;
+            document.getElementById('edit_id').value = id;
+            document.getElementById('edit_nip').value = nip;
+            document.getElementById('edit_nama').value = nama;
+            document.getElementById('edit_username').value = username;
+            document.getElementById('edit_password').value = '';
+            const editForm = document.getElementById('editGuruForm');
+            editForm.action = `/admin/guru/edit/${id}`;
+            new bootstrap.Modal(document.getElementById('editGuruModal')).show();
+        });
+    });
+</script>
+
+<%- include('../partials/footer') %>

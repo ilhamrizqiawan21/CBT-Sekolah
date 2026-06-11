@@ -1,0 +1,133 @@
+<%- include('../partials/header', { title: 'Dashboard Admin' }) %>
+<%- include('../partials/sidebar_admin') %>
+
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="h3 mb-0 text-gray-800">Dashboard</h1>
+            <p class="text-muted">Selamat datang, Administrator</p>
+        </div>
+    </div>
+
+    <!-- Statistik Cards -->
+    <div class="row">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Total Guru</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800"><%= totalGuru %></div>
+                        </div>
+                        <div class="col-auto"><i class="bi bi-people fs-1 text-gray-300"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Total Siswa</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800"><%= totalSiswa %></div>
+                        </div>
+                        <div class="col-auto"><i class="bi bi-person-badge fs-1 text-gray-300"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Total Ujian</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800"><%= totalUjian %></div>
+                        </div>
+                        <div class="col-auto"><i class="bi bi-calendar-check fs-1 text-gray-300"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Total Soal</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800"><%= totalSoal %></div>
+                        </div>
+                        <div class="col-auto"><i class="bi bi-question-circle fs-1 text-gray-300"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ujian Aktif & Siswa Per Kelas -->
+    <div class="row">
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">Ujian Aktif</div>
+                <div class="card-body">
+                    <div class="h2"><%= ujianAktif %></div>
+                    <p class="text-muted">Ujian yang sedang berlangsung</p>
+                    <a href="/admin/ujian" class="btn btn-sm btn-primary">Lihat Semua Ujian</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow">
+                <div class="card-header bg-success text-white">Distribusi Siswa per Kelas</div>
+                <div class="card-body">
+                    <ul class="list-group">
+                        <% siswaPerKelas.forEach(k => { %>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <%= k.kelas || 'Tidak ada kelas' %>
+                                <span class="badge bg-primary rounded-pill"><%= k.jumlah %></span>
+                            </li>
+                        <% }) %>
+                        <% if (siswaPerKelas.length === 0) { %>
+                            <li class="list-group-item">Belum ada data siswa</li>
+                        <% } %>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ujian Terbaru -->
+    <div class="row">
+        <div class="col-12 mb-4">
+            <div class="card shadow">
+                <div class="card-header bg-info text-white">Ujian Terbaru</div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr><th>Nama Ujian</th><th>Mata Pelajaran</th><th>Kelas</th><th>Tanggal Mulai</th><th>Tanggal Selesai</th></tr>
+                            </thead>
+                            <tbody>
+                                <% ujianTerbaru.forEach(u => { %>
+                                <tr>
+                                    <td><%= u.nama_ujian %></td>
+                                    <td><%= u.nama_mapel %></td>
+                                    <td><%= u.nama_kelas %></td>
+                                    <td><%= new Date(u.tanggal_mulai).toLocaleString() %></td>
+                                    <td><%= new Date(u.tanggal_selesai).toLocaleString() %></td>
+                                </tr>
+                                <% }) %>
+                                <% if (ujianTerbaru.length === 0) { %>
+                                <tr><td colspan="5" class="text-center">Belum ada ujian</td></tr>
+                                <% } %>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<%- include('../partials/footer') %>

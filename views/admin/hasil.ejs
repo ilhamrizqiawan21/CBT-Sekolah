@@ -1,0 +1,239 @@
+<%- include('../partials/header', { title: 'Hasil Ujian' }) %>
+<%- include('../partials/sidebar_admin') %>
+
+<div class="container-fluid">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-bar-chart-fill"></i> Hasil Ujian Siswa</h1>
+        <div class="btn-group">
+            <% if (filterUjian) { %>
+                <a href="/admin/hasil/export?ujian=<%= filterUjian %>" class="btn btn-success btn-sm shadow-sm">
+                    <i class="bi bi-file-excel"></i> Export Ringkasan
+                </a>
+                <a href="/admin/hasil/export-detail?ujian_id=<%= filterUjian %>" class="btn btn-info btn-sm shadow-sm">
+                    <i class="bi bi-table"></i> Export Detail Jawaban
+                </a>
+                <a href="/admin/hasil/cetak/<%= filterUjian %>" target="_blank" class="btn btn-secondary btn-sm shadow-sm">
+                    <i class="bi bi-printer"></i> Cetak Laporan PDF
+                </a>
+            <% } else { %>
+                <a href="/admin/hasil/export" class="btn btn-success btn-sm shadow-sm">
+                    <i class="bi bi-file-excel"></i> Export Semua Ringkasan
+                </a>
+                <button class="btn btn-info btn-sm shadow-sm" disabled title="Pilih ujian terlebih dahulu">
+                    <i class="bi bi-table"></i> Export Detail
+                </button>
+                <button class="btn btn-secondary btn-sm shadow-sm" disabled title="Pilih ujian terlebih dahulu">
+                    <i class="bi bi-printer"></i> Cetak PDF
+                </button>
+            <% } %>
+            <button type="button" class="btn btn-danger btn-sm shadow-sm ms-2" data-bs-toggle="modal" data-bs-target="#resetUjianModal">
+                <i class="bi bi-trash"></i> Reset Ujian
+            </button>
+        </div>
+    </div>
+
+    <!-- Statistik Ringkas -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Total Ujian Selesai</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800"><%= statistik.total_ujian_selesai || 0 %></div>
+                        </div>
+                        <div class="col-auto"><i class="bi bi-check-circle-fill fs-1 text-gray-300"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Rata-rata Nilai</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800"><%= Math.round(statistik.rata_rata_nilai || 0) %></div>
+                        </div>
+                        <div class="col-auto"><i class="bi bi-graph-up fs-1 text-gray-300"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Nilai Tertinggi</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800"><%= statistik.nilai_tertinggi || 0 %></div>
+                        </div>
+                        <div class="col-auto"><i class="bi bi-trophy-fill fs-1 text-gray-300"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Nilai Terendah</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800"><%= statistik.nilai_terendah || 0 %></div>
+                        </div>
+                        <div class="col-auto"><i class="bi bi-emoji-frown fs-1 text-gray-300"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Data -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 bg-primary text-white">
+            <h6 class="m-0 font-weight-bold"><i class="bi bi-funnel"></i> Filter Data</h6>
+        </div>
+        <div class="card-body">
+            <form method="GET" action="/admin/hasil" class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label>Ujian</label>
+                    <select name="ujian" class="form-select">
+                        <option value="">Semua Ujian</option>
+                        <% ujianList.forEach(u => { %>
+                            <option value="<%= u.id %>" <%= filterUjian == u.id ? 'selected' : '' %>><%= u.nama_ujian %></option>
+                        <% }) %>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label>Kelas</label>
+                    <select name="kelas" class="form-select">
+                        <option value="">Semua Kelas</option>
+                        <% kelasList.forEach(k => { %>
+                            <option value="<%= k.nama_kelas %>" <%= filterKelas == k.nama_kelas ? 'selected' : '' %>><%= k.nama_kelas %></option>
+                        <% }) %>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100"><i class="bi bi-search"></i> Filter</button>
+                </div>
+                <div class="col-md-2">
+                    <a href="/admin/hasil" class="btn btn-secondary w-100"><i class="bi bi-arrow-repeat"></i> Reset</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Notifikasi -->
+    <% if (msg) { %>
+        <div class="alert alert-success alert-dismissible fade show"><i class="bi bi-check-circle"></i> <%= msg %><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+    <% } %>
+    <% if (error) { %>
+        <div class="alert alert-danger alert-dismissible fade show"><i class="bi bi-exclamation-triangle"></i> <%= error %><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+    <% } %>
+
+    <!-- Tabel Hasil Ujian -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 bg-primary text-white">
+            <h6 class="m-0 font-weight-bold">Daftar Hasil Ujian</h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>NIS</th><th>Siswa</th><th>Kelas</th><th>Ujian</th>
+                            <th>Nilai</th><th>Benar</th><th>Salah</th><th>Kosong</th>
+                            <th>Selesai</th><th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% if (hasil.length > 0) { %>
+                            <% hasil.forEach(h => { 
+                                let nilaiClass = '';
+                                if (h.nilai >= 85) nilaiClass = 'bg-success text-white';
+                                else if (h.nilai >= 70) nilaiClass = 'bg-info text-white';
+                                else if (h.nilai >= 50) nilaiClass = 'bg-warning';
+                                else nilaiClass = 'bg-danger text-white';
+                            %>
+                            <tr>
+                                <td><%= h.nis %></td>
+                                <td><%= h.siswa_nama %></td>
+                                <td><%= h.kelas || '-' %></td>
+                                <td><%= h.nama_ujian %></td>
+                                <td class="text-center"><span class="badge <%= nilaiClass %> fs-6 p-2"><%= h.nilai %></span></td>
+                                <td class="text-center"><span class="badge bg-success"><%= h.benar %></span></td>
+                                <td class="text-center"><span class="badge bg-danger"><%= h.salah %></span></td>
+                                <td class="text-center"><span class="badge bg-secondary"><%= h.kosong %></span></td>
+                                <td class="text-nowrap"><small><%= new Date(h.selesai_pada).toLocaleString() %></small></td>
+                                <td>
+                                    <form action="/admin/reset-ujian" method="POST" class="d-inline" onsubmit="return confirm('Reset ujian untuk <%= h.siswa_nama %>? Semua jawaban akan dihapus.')">
+                                        <input type="hidden" name="siswa_id" value="<%= h.siswa_id %>">
+                                        <input type="hidden" name="ujian_id" value="<%= h.ujian_id %>">
+                                        <button type="submit" class="btn btn-sm btn-warning" title="Reset ujian siswa ini">
+                                            <i class="bi bi-arrow-repeat"></i>
+                                        </button>
+                                    </form>
+                                  </td>
+                            </tr>
+                            <% }) %>
+                        <% } else { %>
+                            <td><td colspan="10" class="text-center">Belum ada data hasil ujian</td></tr>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <% if (totalPages > 1) { %>
+            <nav aria-label="Page navigation" class="mt-4">
+                <ul class="pagination justify-content-center">
+                    <li class="page-item <%= currentPage === 1 ? 'disabled' : '' %>">
+                        <a class="page-link" href="?page=<%= currentPage-1 %><%= filterUjian ? '&ujian='+filterUjian : '' %><%= filterKelas ? '&kelas='+filterKelas : '' %>">Previous</a>
+                    </li>
+                    <% for (let i = 1; i <= totalPages; i++) { %>
+                        <li class="page-item <%= i === currentPage ? 'active' : '' %>">
+                            <a class="page-link" href="?page=<%= i %><%= filterUjian ? '&ujian='+filterUjian : '' %><%= filterKelas ? '&kelas='+filterKelas : '' %>"><%= i %></a>
+                        </li>
+                    <% } %>
+                    <li class="page-item <%= currentPage === totalPages ? 'disabled' : '' %>">
+                        <a class="page-link" href="?page=<%= currentPage+1 %><%= filterUjian ? '&ujian='+filterUjian : '' %><%= filterKelas ? '&kelas='+filterKelas : '' %>">Next</a>
+                    </li>
+                </ul>
+            </nav>
+            <% } %>
+            <div class="text-muted mt-2">Menampilkan <%= hasil.length %> dari total <%= total %> data</div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Reset Semua Ujian -->
+<div class="modal fade" id="resetUjianModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="/admin/reset-ujian-semua" method="POST">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title"><i class="bi bi-exclamation-triangle"></i> Reset Semua Ujian</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Pilih ujian yang akan di-reset (menghapus semua jawaban dan nilai siswa):</p>
+                    <select name="ujian_id" class="form-select" required>
+                        <option value="">-- Pilih Ujian --</option>
+                        <% ujianList.forEach(u => { %>
+                            <option value="<%= u.id %>"><%= u.nama_ujian %></option>
+                        <% }) %>
+                    </select>
+                    <div class="alert alert-warning mt-3">
+                        <i class="bi bi-exclamation-triangle"></i> Peringatan: Tindakan ini akan menghapus semua jawaban dan nilai siswa untuk ujian yang dipilih. Tidak dapat dibatalkan!
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-danger" onclick="return confirm('Yakin akan mereset semua data ujian yang dipilih?')">Reset Semua</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<%- include('../partials/footer') %>

@@ -1,0 +1,114 @@
+<%- include('../partials/header', { title: 'Kelola Mata Pelajaran' }) %>
+<%- include('../partials/sidebar_admin') %>
+
+<div class="container-fluid">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-book"></i> Kelola Mata Pelajaran</h1>
+        <button class="btn btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#tambahMapelModal">
+            <i class="bi bi-plus-circle"></i> Tambah Mapel
+        </button>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Total Mapel</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800"><%= mapel.length %></div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="bi bi-journal-bookmark-fill fs-1 text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <% if (msg) { %>
+        <div class="alert alert-success alert-dismissible fade show"><i class="bi bi-check-circle"></i> <%= msg %><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+    <% } %>
+    <% if (error) { %>
+        <div class="alert alert-danger alert-dismissible fade show"><i class="bi bi-exclamation-triangle"></i> <%= error %><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+    <% } %>
+
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 bg-primary text-white">
+            <h6 class="m-0 font-weight-bold">Daftar Mata Pelajaran</h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover" id="dataTable" width="100%">
+                    <thead class="table-light">
+                        <tr><th>ID</th><th>Nama Mata Pelajaran</th><th>Aksi</th></tr>
+                    </thead>
+                    <tbody>
+                        <% if (mapel.length > 0) { %>
+                            <% mapel.forEach(m => { %>
+                            <tr>
+                                <td><%= m.id %></td>
+                                <td><%= m.nama_mapel %></td>
+                                <td>
+                                    <button class="btn btn-sm btn-warning btn-edit" data-id="<%= m.id %>" data-nama="<%= m.nama_mapel %>"><i class="bi bi-pencil"></i> Edit</button>
+                                    <a href="/admin/mapel/hapus/<%= m.id %>" class="btn btn-sm btn-danger" onclick="return confirm('Yakin hapus mata pelajaran ini? Akan mempengaruhi ujian yang terkait.')"><i class="bi bi-trash"></i> Hapus</a>
+                                 </td>
+                             </tr>
+                            <% }) %>
+                        <% } else { %>
+                            <tr><td colspan="3" class="text-center">Belum ada data mata pelajaran</td></tr>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Tambah Mapel -->
+<div class="modal fade" id="tambahMapelModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="/admin/mapel/tambah" method="POST">
+                <div class="modal-header bg-primary text-white"><h5 class="modal-title"><i class="bi bi-plus-circle"></i> Tambah Mata Pelajaran</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <div class="mb-3"><label>Nama Mata Pelajaran <span class="text-danger">*</span></label><input type="text" name="nama_mapel" class="form-control" placeholder="Contoh: Matematika, Bahasa Indonesia, IPA" required></div>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button><button type="submit" class="btn btn-primary">Simpan</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Edit Mapel -->
+<div class="modal fade" id="editMapelModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="editMapelForm" method="POST">
+                <div class="modal-header bg-warning text-dark"><h5 class="modal-title"><i class="bi bi-pencil-square"></i> Edit Mata Pelajaran</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <input type="hidden" name="id" id="edit_id">
+                    <div class="mb-3"><label>Nama Mata Pelajaran</label><input type="text" name="nama_mapel" id="edit_nama" class="form-control" required></div>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button><button type="submit" class="btn btn-warning">Update</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.querySelectorAll('.btn-edit').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const id = this.dataset.id;
+            const nama = this.dataset.nama;
+            document.getElementById('edit_id').value = id;
+            document.getElementById('edit_nama').value = nama;
+            const editForm = document.getElementById('editMapelForm');
+            editForm.action = `/admin/mapel/edit/${id}`;
+            new bootstrap.Modal(document.getElementById('editMapelModal')).show();
+        });
+    });
+</script>
+
+<%- include('../partials/footer') %>

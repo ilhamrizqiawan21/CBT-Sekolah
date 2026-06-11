@@ -1,0 +1,49 @@
+D:\CBT-Sekolah\
+├── app.js
+├── .env
+├── package.json (sudah ada)
+├── routes\
+│   ├── index.js
+│   ├── admin.js
+│   ├── guru.js
+│   ├── api.js
+├── controllers\
+│   ├── authController.js
+│   ├── ujianController.js
+│   ├── adminController.js
+│   ├── guruController.js
+├── models\
+│   ├── db.js
+│   ├── userModel.js
+│   ├── ujianModel.js
+├── views\
+│   ├── partials\
+│   │   ├── header.ejs
+│   │   ├── sidebar_admin.ejs
+│   │   ├── sidebar_guru.ejs
+│   │   ├── footer.ejs
+│   ├── login.ejs
+│   ├── ujian.ejs
+│   ├── admin\
+│   │   ├── dashboard.ejs
+│   │   ├── guru.ejs
+│   │   ├── kelas.ejs
+│   │   ├── mapel.ejs
+│   │   ├── ujian.ejs
+│   │   ├── soal.ejs
+│   │   ├── hasil.ejs
+│   ├── guru\
+│   │   ├── dashboard.ejs
+│   │   ├── kelola_soal.ejs
+│   │   ├── hasil_siswa.ejs
+├── public\
+│   ├── css\
+│   │   └── style.css
+│   ├── js\
+│   │   ├── ujian.js
+│   │   ├── admin.js
+│   │   └── guru.js
+├── middleware\
+│   ├── auth.js
+├── utils\
+│   └── excelExport.js

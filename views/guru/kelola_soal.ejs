@@ -1,0 +1,98 @@
+<%- include('../partials/header', { title: 'Kelola Soal' }) %>
+<%- include('../partials/sidebar_guru') %>
+
+<div class="container-fluid">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-question-circle"></i> Kelola Soal</h1>
+        <div>
+            <a href="/guru/kelola-soal/tambah-batch" class="btn btn-success shadow-sm me-2">
+                <i class="bi bi-table"></i> Tambah Soal Batch
+            </a>
+        </div>
+    </div>
+
+    <!-- Filter -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 bg-success text-white">
+            <h6 class="m-0 font-weight-bold"><i class="bi bi-funnel"></i> Filter Data</h6>
+        </div>
+        <div class="card-body">
+            <form method="GET" action="/guru/kelola-soal" class="row g-3 align-items-end">
+                <div class="col-md-5">
+                    <label>Ujian</label>
+                    <select name="ujian" class="form-select">
+                        <option value="">Semua Ujian</option>
+                        <% ujianList.forEach(u => { %>
+                            <option value="<%= u.id %>" <%= filterUjian == u.id ? 'selected' : '' %>>
+                                <%= u.nama_ujian %> - <%= u.nama_mapel %> (Kelas <%= u.nama_kelas %>)
+                            </option>
+                        <% }) %>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-success w-100"><i class="bi bi-search"></i> Filter</button>
+                </div>
+                <div class="col-md-2">
+                    <a href="/guru/kelola-soal" class="btn btn-secondary w-100"><i class="bi bi-arrow-repeat"></i> Reset</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Notifikasi -->
+    <% if (msg) { %><div class="alert alert-success"><%= msg %></div><% } %>
+    <% if (error) { %><div class="alert alert-danger"><%= error %></div><% } %>
+
+    <!-- Tabel Soal -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 bg-success text-white">
+            <h6 class="m-0 font-weight-bold">Daftar Soal</h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID</th><th>Ujian</th><th>Tipe</th><th>Teks Soal</th><th>Poin</th><th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% if (soal.length > 0) { %>
+                            <% soal.forEach(s => { %>
+                            <tr>
+                                <td><%= s.id %></td>
+                                <td><%= s.nama_ujian %><br><small class="text-muted"><%= s.nama_mapel %> - <%= s.nama_kelas %></small></td>
+                                <td><span class="badge <%= s.tipe_soal === 'pg' ? 'bg-primary' : (s.tipe_soal === 'menjodohkan' ? 'bg-info' : 'bg-warning') %>">
+                                    <%= s.tipe_soal === 'pg' ? 'Pilihan Ganda' : (s.tipe_soal === 'menjodohkan' ? 'Menjodohkan' : 'Essay') %>
+                                </span></td>
+                                <td><%= s.teks_soal.substring(0, 50) %>...</td>
+                                <td><%= s.poin %></td>
+                                <td>
+                                    <a href="/guru/soal/edit/<%= s.id %>" class="btn btn-sm btn-warning"><i class="bi bi-pencil"></i></a>
+                                    <a href="/guru/soal/hapus/<%= s.id %>" class="btn btn-sm btn-danger" onclick="return confirm('Yakin hapus soal ini?')"><i class="bi bi-trash"></i></a>
+                                 </td>
+                              </tr>
+                            <% }) %>
+                        <% } else { %>
+                            <tr><td colspan="6" class="text-center">Belum ada data soal untuk ujian yang Anda ajar</td></tr>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <% if (totalPages > 1) { %>
+            <nav><ul class="pagination justify-content-center">
+                <li class="page-item <%= currentPage === 1 ? 'disabled' : '' %>"><a class="page-link" href="?page=<%= currentPage-1 %><%= filterUjian ? '&ujian='+filterUjian : '' %>">Prev</a></li>
+                <% for (let i = 1; i <= totalPages; i++) { %>
+                    <li class="page-item <%= i === currentPage ? 'active' : '' %>"><a class="page-link" href="?page=<%= i %><%= filterUjian ? '&ujian='+filterUjian : '' %>"><%= i %></a></li>
+                <% } %>
+                <li class="page-item <%= currentPage === totalPages ? 'disabled' : '' %>"><a class="page-link" href="?page=<%= currentPage+1 %><%= filterUjian ? '&ujian='+filterUjian : '' %>">Next</a></li>
+            </ul></nav>
+            <% } %>
+            <div class="text-muted">Menampilkan <%= soal.length %> dari <%= total %> soal</div>
+        </div>
+    </div>
+</div>
+
+<%- include('../partials/footer') %>

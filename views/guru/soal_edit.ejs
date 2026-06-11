@@ -1,0 +1,37 @@
+<%- include('../partials/header', { title: 'Edit Soal' }) %>
+<%- include('../partials/sidebar_guru') %>
+
+<div class="container-fluid">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-pencil-square"></i> Edit Soal</h1>
+        <a href="/guru/kelola-soal" class="btn btn-secondary"><i class="bi bi-arrow-left"></i> Kembali</a>
+    </div>
+
+    <div class="card shadow">
+        <div class="card-body">
+            <form action="/guru/soal/edit/<%= soal.id %>" method="POST">
+                <div class="row">
+                    <div class="col-md-6 mb-3"><label>Ujian</label><select name="ujian_id" class="form-select" required><% ujianList.forEach(u => { %><option value="<%= u.id %>" <%= u.id == soal.ujian_id ? 'selected' : '' %>><%= u.nama_ujian %> - <%= u.nama_mapel %> (<%= u.nama_kelas %>)</option><% }) %></select></div>
+                    <div class="col-md-3 mb-3"><label>Tipe Soal</label><select name="tipe_soal" class="form-select" required><option value="pg" <%= soal.tipe_soal === 'pg' ? 'selected' : '' %>>Pilihan Ganda</option><option value="menjodohkan" <%= soal.tipe_soal === 'menjodohkan' ? 'selected' : '' %>>Menjodohkan</option><option value="essay" <%= soal.tipe_soal === 'essay' ? 'selected' : '' %>>Essay</option></select></div>
+                    <div class="col-md-3 mb-3"><label>Poin</label><input type="number" name="poin" class="form-control" value="<%= soal.poin %>"></div>
+                    <div class="col-12 mb-3"><label>Teks Soal</label><textarea name="teks_soal" class="form-control" rows="3" required><%= soal.teks_soal %></textarea></div>
+                </div>
+                <% if (soal.tipe_soal === 'pg') { %>
+                <div class="row">
+                    <div class="col-md-6 mb-2"><label>Pilihan A</label><input type="text" name="pilihan_a" class="form-control" value="<%= soal.pilihan_a %>"></div>
+                    <div class="col-md-6 mb-2"><label>Pilihan B</label><input type="text" name="pilihan_b" class="form-control" value="<%= soal.pilihan_b %>"></div>
+                    <div class="col-md-6 mb-2"><label>Pilihan C</label><input type="text" name="pilihan_c" class="form-control" value="<%= soal.pilihan_c %>"></div>
+                    <div class="col-md-6 mb-2"><label>Pilihan D</label><input type="text" name="pilihan_d" class="form-control" value="<%= soal.pilihan_d %>"></div>
+                    <div class="col-12 mb-2"><label>Jawaban Benar (A/B/C/D)</label><input type="text" name="jawaban_benar" class="form-control" value="<%= soal.jawaban_benar %>"></div>
+                </div>
+                <% } else { %>
+                <div class="mb-3"><label>Jawaban Benar (JSON untuk menjodohkan / kata kunci untuk essay)</label><textarea name="jawaban_benar" class="form-control" rows="3"><%= soal.jawaban_benar %></textarea></div>
+                <div class="mb-3"><label>Opsi Tambahan (JSON)</label><textarea name="opsi_tambahan" class="form-control" rows="3"><%= soal.opsi_tambahan || '' %></textarea></div>
+                <% } %>
+                <button type="submit" class="btn btn-primary">Update Soal</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<%- include('../partials/footer') %>

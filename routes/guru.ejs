@@ -1,0 +1,40 @@
+<%- include('../partials/header', { title: 'Kelola Guru' }) %>
+<%- include('../partials/sidebar_admin') %>
+
+<h2>Kelola Guru</h2>
+<button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#tambahGuruModal">Tambah Guru</button>
+<table class="table table-bordered">
+    <thead>
+        <tr><th>NIP</th><th>Nama</th><th>Username</th><th>Aksi</th></tr>
+    </thead>
+    <tbody>
+        <% guru.forEach(g => { %>
+        <tr>
+            <td><%= g.nip %></td>
+            <td><%= g.nama %></td>
+            <td><%= g.username %></td>
+            <td><a href="/admin/guru/hapus/<%= g.id %>" class="btn btn-sm btn-danger" onclick="return confirm('Yakin?')">Hapus</a></td>
+        </tr>
+        <% }) %>
+    </tbody>
+</table>
+
+<!-- Modal Tambah Guru -->
+<div class="modal fade" id="tambahGuruModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="/admin/guru/tambah" method="POST">
+                <div class="modal-header"><h5>Tambah Guru</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <div class="mb-3"><label>NIP</label><input type="text" name="nip" class="form-control" required></div>
+                    <div class="mb-3"><label>Nama</label><input type="text" name="nama" class="form-control" required></div>
+                    <div class="mb-3"><label>Username</label><input type="text" name="username" class="form-control" required></div>
+                    <div class="mb-3"><label>Password</label><input type="password" name="password" class="form-control" required></div>
+                </div>
+                <div class="modal-footer"><button type="submit" class="btn btn-primary">Simpan</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<%- include('../partials/footer') %>

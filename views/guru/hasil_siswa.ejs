@@ -1,0 +1,180 @@
+<%- include('../partials/header', { title: 'Hasil Siswa' }) %>
+<%- include('../partials/sidebar_guru') %>
+
+<div class="container-fluid">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-bar-chart-fill"></i> Hasil Ujian Siswa</h1>
+        <a href="/guru/hasil-siswa/export<%= filterUjian ? '?ujian='+filterUjian : '' %><%= filterKelas ? (filterUjian ? '&' : '?')+'kelas='+filterKelas : '' %>" class="btn btn-success shadow-sm">
+            <i class="bi bi-file-excel"></i> Export ke Excel
+        </a>
+    </div>
+
+    <!-- Statistik Ringkas -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Total Ujian Selesai</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800"><%= statistik.total_ujian_selesai || 0 %></div>
+                        </div>
+                        <div class="col-auto"><i class="bi bi-check-circle-fill fs-1 text-gray-300"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Rata-rata Nilai</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800"><%= Math.round(statistik.rata_rata_nilai || 0) %></div>
+                        </div>
+                        <div class="col-auto"><i class="bi bi-graph-up fs-1 text-gray-300"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Nilai Tertinggi</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800"><%= statistik.nilai_tertinggi || 0 %></div>
+                        </div>
+                        <div class="col-auto"><i class="bi bi-trophy-fill fs-1 text-gray-300"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Nilai Terendah</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800"><%= statistik.nilai_terendah || 0 %></div>
+                        </div>
+                        <div class="col-auto"><i class="bi bi-emoji-frown fs-1 text-gray-300"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Data -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 bg-success text-white">
+            <h6 class="m-0 font-weight-bold"><i class="bi bi-funnel"></i> Filter Data</h6>
+        </div>
+        <div class="card-body">
+            <form method="GET" action="/guru/hasil-siswa" class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label>Ujian</label>
+                    <select name="ujian" class="form-select">
+                        <option value="">Semua Ujian</option>
+                        <% ujianList.forEach(u => { %>
+                            <option value="<%= u.id %>" <%= filterUjian == u.id ? 'selected' : '' %>>
+                                <%= u.nama_ujian %> - <%= u.nama_mapel %> (Kelas <%= u.nama_kelas %>)
+                            </option>
+                        <% }) %>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label>Kelas</label>
+                    <select name="kelas" class="form-select">
+                        <option value="">Semua Kelas</option>
+                        <% kelasList.forEach(k => { %>
+                            <option value="<%= k.id %>" <%= filterKelas == k.id ? 'selected' : '' %>><%= k.nama_kelas %></option>
+                        <% }) %>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-success w-100"><i class="bi bi-search"></i> Filter</button>
+                </div>
+                <div class="col-md-2">
+                    <a href="/guru/hasil-siswa" class="btn btn-secondary w-100"><i class="bi bi-arrow-repeat"></i> Reset</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Notifikasi -->
+    <% if (msg) { %>
+        <div class="alert alert-success alert-dismissible fade show"><i class="bi bi-check-circle"></i> <%= msg %><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+    <% } %>
+    <% if (error) { %>
+        <div class="alert alert-danger alert-dismissible fade show"><i class="bi bi-exclamation-triangle"></i> <%= error %><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+    <% } %>
+
+    <!-- Tabel Hasil Ujian -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 bg-success text-white">
+            <h6 class="m-0 font-weight-bold">Daftar Hasil Ujian</h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>NIS</th><th>Siswa</th><th>Kelas</th><th>Ujian</th><th>Mapel</th>
+                            <th>Nilai</th><th>Benar</th><th>Salah</th><th>Kosong</th>
+                            <th>Selesai</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% if (hasil.length > 0) { %>
+                            <% hasil.forEach(h => { 
+                                let nilaiClass = '';
+                                if (h.nilai >= 85) nilaiClass = 'bg-success text-white';
+                                else if (h.nilai >= 70) nilaiClass = 'bg-info text-white';
+                                else if (h.nilai >= 50) nilaiClass = 'bg-warning';
+                                else nilaiClass = 'bg-danger text-white';
+                            %>
+                            <tr>
+                                <td><%= h.nis %></td>
+                                <td><%= h.siswa_nama %></td>
+                                <td><%= h.nama_kelas || '-' %></td>
+                                <td><%= h.nama_ujian %></td>
+                                <td><%= h.nama_mapel %></td>
+                                <td class="text-center"><span class="badge <%= nilaiClass %> fs-6 p-2"><%= h.nilai %></span></td>
+                                <td class="text-center"><span class="badge bg-success"><%= h.benar %></span></td>
+                                <td class="text-center"><span class="badge bg-danger"><%= h.salah %></span></td>
+                                <td class="text-center"><span class="badge bg-secondary"><%= h.kosong %></span></td>
+                                <td class="text-nowrap"><small><%= new Date(h.selesai_pada).toLocaleString() %></small></td>
+                            </tr>
+                            <% }) %>
+                        <% } else { %>
+                            <tr><td colspan="11" class="text-center">Belum ada data hasil ujian untuk mata pelajaran yang Anda ajar</td></tr>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <% if (totalPages > 1) { %>
+            <nav aria-label="Page navigation" class="mt-4">
+                <ul class="pagination justify-content-center">
+                    <li class="page-item <%= currentPage === 1 ? 'disabled' : '' %>">
+                        <a class="page-link" href="?page=<%= currentPage-1 %><%= filterUjian ? '&ujian='+filterUjian : '' %><%= filterKelas ? '&kelas='+filterKelas : '' %>">Previous</a>
+                    </li>
+                    <% for (let i = 1; i <= totalPages; i++) { %>
+                        <li class="page-item <%= i === currentPage ? 'active' : '' %>">
+                            <a class="page-link" href="?page=<%= i %><%= filterUjian ? '&ujian='+filterUjian : '' %><%= filterKelas ? '&kelas='+filterKelas : '' %>"><%= i %></a>
+                        </li>
+                    <% } %>
+                    <li class="page-item <%= currentPage === totalPages ? 'disabled' : '' %>">
+                        <a class="page-link" href="?page=<%= currentPage+1 %><%= filterUjian ? '&ujian='+filterUjian : '' %><%= filterKelas ? '&kelas='+filterKelas : '' %>">Next</a>
+                    </li>
+                </ul>
+            </nav>
+            <% } %>
+            <div class="text-muted mt-2">Menampilkan <%= hasil.length %> dari total <%= total %> data</div>
+        </div>
+    </div>
+</div>
+
+<%- include('../partials/footer') %>

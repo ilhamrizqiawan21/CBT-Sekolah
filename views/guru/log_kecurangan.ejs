@@ -1,0 +1,245 @@
+<%- include('../partials/header', { title: 'Log Kecurangan' }) %>
+<%- include('../partials/sidebar_guru') %>
+
+<div class="container-fluid">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-exclamation-triangle-fill"></i> Log Kecurangan</h1>
+        <a href="/guru/log-kecurangan/export<%= filterUjian ? '?ujian='+filterUjian : '' %><%= filterSiswa ? (filterUjian ? '&' : '?')+'siswa='+filterSiswa : '' %><%= filterJenis ? ((filterUjian || filterSiswa) ? '&' : '?')+'jenis='+filterJenis : '' %>" class="btn btn-success shadow-sm">
+            <i class="bi bi-file-excel"></i> Export ke Excel
+        </a>
+    </div>
+
+    <!-- Statistik Ringkas -->
+    <div class="row mb-4">
+        <div class="col-xl-4 col-md-6 mb-3">
+            <div class="card border-left-danger shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">Total Pelanggaran</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800"><%= total %></div>
+                        </div>
+                        <div class="col-auto"><i class="bi bi-exclamation-octagon fs-1 text-gray-300"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-4 col-md-6 mb-3">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Siswa Terlibat</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800"><%= statistik.total_siswa || 0 %></div>
+                        </div>
+                        <div class="col-auto"><i class="bi bi-people fs-1 text-gray-300"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-4 mb-3">
+            <div class="card shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Distribusi Jenis Pelanggaran</div>
+                    <div class="row mt-2">
+                        <div class="col-4 text-center">
+                            <span class="badge bg-danger p-2">Pindah Tab</span>
+                            <div class="h6 mt-1"><%= statistik.pindah_tab || 0 %> x</div>
+                        </div>
+                        <div class="col-4 text-center">
+                            <span class="badge bg-warning p-2">Copy Paste</span>
+                            <div class="h6 mt-1"><%= statistik.copy_paste || 0 %> x</div>
+                        </div>
+                        <div class="col-4 text-center">
+                            <span class="badge bg-info p-2">Lainnya</span>
+                            <div class="h6 mt-1"><%= statistik.lainnya || 0 %> x</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Data -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 bg-danger text-white">
+            <h6 class="m-0 font-weight-bold"><i class="bi bi-funnel"></i> Filter Data</h6>
+        </div>
+        <div class="card-body">
+            <form method="GET" action="/guru/log-kecurangan" class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label>Ujian</label>
+                    <select name="ujian" class="form-select">
+                        <option value="">Semua Ujian</option>
+                        <% ujianList.forEach(u => { %>
+                            <option value="<%= u.id %>" <%= filterUjian == u.id ? 'selected' : '' %>>
+                                <%= u.nama_ujian %> - <%= u.nama_mapel %> (Kelas <%= u.nama_kelas %>)
+                            </option>
+                        <% }) %>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label>Siswa</label>
+                    <select name="siswa" class="form-select">
+                        <option value="">Semua Siswa</option>
+                        <% siswaList.forEach(s => { %>
+                            <option value="<%= s.id %>" <%= filterSiswa == s.id ? 'selected' : '' %>>
+                                <%= s.nis %> - <%= s.nama %>
+                            </option>
+                        <% }) %>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label>Jenis Kecurangan</label>
+                    <select name="jenis" class="form-select">
+                        <option value="">Semua Jenis</option>
+                        <option value="pindah_tab" <%= filterJenis === 'pindah_tab' ? 'selected' : '' %>>Pindah Tab</option>
+                        <option value="copy_paste" <%= filterJenis === 'copy_paste' ? 'selected' : '' %>>Copy Paste</option>
+                        <option value="lainnya" <%= filterJenis === 'lainnya' ? 'selected' : '' %>>Lainnya</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-danger w-100"><i class="bi bi-search"></i> Filter</button>
+                </div>
+                <div class="col-md-1">
+                    <a href="/guru/log-kecurangan" class="btn btn-secondary w-100"><i class="bi bi-arrow-repeat"></i></a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Notifikasi -->
+    <% if (msg) { %>
+        <div class="alert alert-success alert-dismissible fade show"><i class="bi bi-check-circle"></i> <%= msg %><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+    <% } %>
+    <% if (error) { %>
+        <div class="alert alert-danger alert-dismissible fade show"><i class="bi bi-exclamation-triangle"></i> <%= error %><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+    <% } %>
+
+    <!-- Tabel Log Kecurangan -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 bg-danger text-white">
+            <h6 class="m-0 font-weight-bold">Daftar Pelanggaran Siswa</h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Waktu</th>
+                            <th>Siswa (NIS)</th>
+                            <th>Kelas</th>
+                            <th>Ujian</th>
+                            <th>Mapel</th>
+                            <th>Jenis Kecurangan</th>
+                            <th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% if (logs.length > 0) { %>
+                            <% logs.forEach(log => { 
+                                let badgeClass = '';
+                                if (log.jenis_kecurangan === 'pindah_tab') badgeClass = 'bg-danger';
+                                else if (log.jenis_kecurangan === 'copy_paste') badgeClass = 'bg-warning';
+                                else badgeClass = 'bg-info';
+                            %>
+                            <tr>
+                                <td class="text-nowrap"><small><%= new Date(log.timestamp).toLocaleString() %></small></td>
+                                <td><%= log.siswa_nama %> (<%= log.nis %>)</td>
+                                <td><%= log.nama_kelas || '-' %></td>
+                                <td><%= log.nama_ujian %></td>
+                                <td><%= log.nama_mapel %></td>
+                                <td><span class="badge <%= badgeClass %>"><%= log.jenis_kecurangan.replace('_', ' ') %></span></td>
+                                <td>
+                                    <button class="btn btn-sm btn-info btn-detail" 
+                                        data-siswa="<%= log.siswa_nama %>"
+                                        data-nis="<%= log.nis %>"
+                                        data-kelas="<%= log.nama_kelas %>"
+                                        data-ujian="<%= log.nama_ujian %>"
+                                        data-mapel="<%= log.nama_mapel %>"
+                                        data-jenis="<%= log.jenis_kecurangan %>"
+                                        data-waktu="<%= new Date(log.timestamp).toLocaleString() %>"
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#detailModal">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                  </td>
+                            </tr>
+                            <% }) %>
+                        <% } else { %>
+                            <tr><td colspan="7" class="text-center">Belum ada data kecurangan untuk mata pelajaran yang Anda ajar</td></tr>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <% if (totalPages > 1) { %>
+            <nav aria-label="Page navigation" class="mt-4">
+                <ul class="pagination justify-content-center">
+                    <li class="page-item <%= currentPage === 1 ? 'disabled' : '' %>">
+                        <a class="page-link" href="?page=<%= currentPage-1 %><%= filterUjian ? '&ujian='+filterUjian : '' %><%= filterSiswa ? '&siswa='+filterSiswa : '' %><%= filterJenis ? '&jenis='+filterJenis : '' %>">Previous</a>
+                    </li>
+                    <% for (let i = 1; i <= totalPages; i++) { %>
+                        <li class="page-item <%= i === currentPage ? 'active' : '' %>">
+                            <a class="page-link" href="?page=<%= i %><%= filterUjian ? '&ujian='+filterUjian : '' %><%= filterSiswa ? '&siswa='+filterSiswa : '' %><%= filterJenis ? '&jenis='+filterJenis : '' %>"><%= i %></a>
+                        </li>
+                    <% } %>
+                    <li class="page-item <%= currentPage === totalPages ? 'disabled' : '' %>">
+                        <a class="page-link" href="?page=<%= currentPage+1 %><%= filterUjian ? '&ujian='+filterUjian : '' %><%= filterSiswa ? '&siswa='+filterSiswa : '' %><%= filterJenis ? '&jenis='+filterJenis : '' %>">Next</a>
+                    </li>
+                </ul>
+            </nav>
+            <% } %>
+            <div class="text-muted mt-2">Menampilkan <%= logs.length %> dari total <%= total %> pelanggaran</div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Detail Kecurangan -->
+<div class="modal fade" id="detailModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="bi bi-info-circle"></i> Detail Kecurangan</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <table class="table table-bordered">
+                    <tr><th style="width:40%">Waktu</th><td id="detailWaktu"></td></tr>
+                    <tr><th>Siswa</th><td id="detailSiswa"></td></tr>
+                    <tr><th>NIS</th><td id="detailNis"></td></tr>
+                    <tr><th>Kelas</th><td id="detailKelas"></td></tr>
+                    <tr><th>Ujian</th><td id="detailUjian"></td></tr>
+                    <tr><th>Mata Pelajaran</th><td id="detailMapel"></td></tr>
+                    <tr><th>Jenis Kecurangan</th><td id="detailJenis"></td></tr>
+                </table>
+                <div class="alert alert-warning mt-2">
+                    <i class="bi bi-exclamation-triangle"></i> Pelanggaran ini telah dicatat untuk evaluasi dan pembinaan siswa.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Handle modal detail
+    document.querySelectorAll('.btn-detail').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.getElementById('detailWaktu').innerText = this.dataset.waktu;
+            document.getElementById('detailSiswa').innerText = this.dataset.siswa;
+            document.getElementById('detailNis').innerText = this.dataset.nis;
+            document.getElementById('detailKelas').innerText = this.dataset.kelas || '-';
+            document.getElementById('detailUjian').innerText = this.dataset.ujian;
+            document.getElementById('detailMapel').innerText = this.dataset.mapel;
+            let jenis = this.dataset.jenis.replace('_', ' ');
+            let badgeClass = this.dataset.jenis === 'pindah_tab' ? 'danger' : (this.dataset.jenis === 'copy_paste' ? 'warning' : 'info');
+            document.getElementById('detailJenis').innerHTML = `<span class="badge bg-${badgeClass}">${jenis}</span>`;
+        });
+    });
+</script>
+
+<%- include('../partials/footer') %>

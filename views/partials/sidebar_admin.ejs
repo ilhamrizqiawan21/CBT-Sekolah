@@ -1,0 +1,114 @@
+<!-- ══ SIDEBAR ADMIN ══ -->
+<nav class="sidebar" id="sidebar">
+    <!-- Brand -->
+    <div class="sidebar-brand">
+        <img src="/images/logo-sekolah.png" alt="Logo" style="width:32px;height:32px;object-fit:contain;flex-shrink:0;">
+        <span class="sidebar-brand-text">CBT Admin</span>
+    </div>
+
+    <!-- Nav -->
+    <ul class="nav flex-column mt-2" style="position:relative;z-index:1;">
+        <li class="nav-item">
+            <a class="nav-link" href="/admin/dashboard" data-tooltip="Dashboard">
+                <i class="bi bi-speedometer2"></i>
+                <span class="nav-text">Dashboard</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="/admin/guru" data-tooltip="Guru">
+                <i class="bi bi-person-badge"></i>
+                <span class="nav-text">Guru</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="/admin/kelas" data-tooltip="Kelas">
+                <i class="bi bi-building"></i>
+                <span class="nav-text">Kelas</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="/admin/siswa" data-tooltip="Siswa">
+                <i class="bi bi-people"></i>
+                <span class="nav-text">Siswa</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="/admin/mapel" data-tooltip="Mata Pelajaran">
+                <i class="bi bi-book"></i>
+                <span class="nav-text">Mata Pelajaran</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="/admin/pengajaran" data-tooltip="Pengajaran">
+                <i class="bi bi-journal-bookmark-fill"></i>
+                <span class="nav-text">Pengajaran</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="/admin/ujian" data-tooltip="Ujian">
+                <i class="bi bi-calendar-check"></i>
+                <span class="nav-text">Ujian</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="/admin/soal" data-tooltip="Soal">
+                <i class="bi bi-question-circle"></i>
+                <span class="nav-text">Soal</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="/admin/soal/tambah-batch" data-tooltip="Tambah Soal Batch">
+                <i class="bi bi-table"></i>
+                <span class="nav-text">Tambah Soal Batch</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="/admin/hasil" data-tooltip="Hasil Ujian">
+                <i class="bi bi-bar-chart"></i>
+                <span class="nav-text">Hasil Ujian</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="/admin/log-kecurangan" data-tooltip="Log Kecurangan">
+                <i class="bi bi-exclamation-triangle"></i>
+                <span class="nav-text">Log Kecurangan</span>
+            </a>
+        </li>
+
+        <li class="nav-item" style="margin-top:auto;padding-top:1rem;">
+            <hr style="border-color:rgba(255,255,255,.1);margin:.5rem 0;">
+            <a class="nav-link" href="/logout-admin" data-tooltip="Logout"
+               style="color:rgba(255,100,100,.85) !important;">
+                <i class="bi bi-box-arrow-right"></i>
+                <span class="nav-text">Logout</span>
+            </a>
+        </li>
+    </ul>
+</nav>
+<!-- ══ END SIDEBAR ADMIN ══ -->
+
+<!-- ══ CONTENT WRAPPER ══ -->
+<div id="content-wrapper" class="d-flex flex-column">
+
+    <!-- TOPBAR -->
+    <nav class="navbar topbar">
+        <!-- Toggle button -->
+        <button id="sidebarToggle" class="sidebar-toggle-btn" aria-label="Toggle navigasi" aria-expanded="true">
+            <i class="bi bi-list" id="toggleIcon"></i>
+        </button>
+
+        <!-- Page title (opsional, otomatis ambil dari <title>) -->
+        <span class="topbar-title d-none d-md-inline text-muted" style="font-size:.8rem;font-weight:600;letter-spacing:.04em;"></span>
+
+        <div class="ms-auto d-flex align-items-center gap-2">
+            <span class="badge bg-primary" style="font-size:.75rem;padding:.4em .8em;">
+                <i class="bi bi-shield-check me-1"></i>Administrator
+            </span>
+            <a href="/logout-admin" class="btn btn-sm btn-secondary" title="Logout">
+                <i class="bi bi-box-arrow-right"></i>
+            </a>
+        </div>
+    </nav>
+    <!-- ══ END TOPBAR ══ -->
+
+    <!-- Konten halaman dimulai di sini -->

@@ -1,0 +1,138 @@
+<%- include('../partials/header', { title: 'Manajemen Siswa' }) %>
+<%- include('../partials/sidebar_admin') %>
+
+<div class="container-fluid">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-people-fill"></i> Manajemen Siswa</h1>
+        <div>
+            <a href="/admin/siswa/template" class="btn btn-outline-primary me-2"><i class="bi bi-download"></i> Template Excel</a>
+            <button class="btn btn-success me-2" data-bs-toggle="modal" data-bs-target="#importModal"><i class="bi bi-upload"></i> Import Excel</button>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#tambahModal"><i class="bi bi-plus-lg"></i> Tambah Siswa</button>
+        </div>
+    </div>
+
+    <!-- Filter Kelas -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 bg-primary text-white">
+            <h6 class="m-0 font-weight-bold">Filter Data</h6>
+        </div>
+        <div class="card-body">
+            <form method="GET" action="/admin/siswa" class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label for="filterKelas" class="form-label">Kelas</label>
+                    <select name="kelas" id="filterKelas" class="form-select">
+                        <option value="">Semua Kelas</option>
+                        <% kelasList.forEach(k => { %>
+                            <option value="<%= k.nama_kelas %>" <%= filterKelas === k.nama_kelas ? 'selected' : '' %>><%= k.nama_kelas %></option>
+                        <% }) %>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100"><i class="bi bi-funnel"></i> Filter</button>
+                </div>
+                <div class="col-md-2">
+                    <a href="/admin/siswa" class="btn btn-secondary w-100"><i class="bi bi-arrow-repeat"></i> Reset</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Notifikasi -->
+    <% if (msg) { %>
+        <div class="alert alert-success alert-dismissible fade show"><%= msg %><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+    <% } %>
+    <% if (error) { %>
+        <div class="alert alert-danger alert-dismissible fade show"><%= error %><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+    <% } %>
+
+    <!-- Tabel Data Siswa -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 bg-primary text-white">
+            <h6 class="m-0 font-weight-bold">Daftar Siswa</h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>NIS</th><th>Nama</th><th>Kelas</th><th>PIN Ujian</th><th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% if (siswa.length > 0) { %>
+                            <% siswa.forEach(s => { %>
+                            <tr>
+                                <td><%= s.nis %></td>
+                                <td><%= s.nama %></td>
+                                <td><%= s.kelas || '-' %></td>
+                                <td><%= s.pin_ujian %></td>
+                                <td>
+                                    <a href="/admin/siswa/hapus/<%= s.id %>" class="btn btn-sm btn-danger" onclick="return confirm('Yakin hapus siswa ini? Semua data ujiannya juga akan terhapus.')"><i class="bi bi-trash"></i> Hapus</a>
+                                </td>
+                            </tr>
+                            <% }) %>
+                        <% } else { %>
+                            <tr><td colspan="5" class="text-center">Belum ada data siswa</td></tr>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <% if (totalPages > 1) { %>
+            <nav aria-label="Page navigation" class="mt-4">
+                <ul class="pagination justify-content-center">
+                    <li class="page-item <%= currentPage === 1 ? 'disabled' : '' %>">
+                        <a class="page-link" href="?page=<%= currentPage-1 %><%= filterKelas ? '&kelas='+filterKelas : '' %>">Previous</a>
+                    </li>
+                    <% for (let i = 1; i <= totalPages; i++) { %>
+                        <li class="page-item <%= i === currentPage ? 'active' : '' %>">
+                            <a class="page-link" href="?page=<%= i %><%= filterKelas ? '&kelas='+filterKelas : '' %>"><%= i %></a>
+                        </li>
+                    <% } %>
+                    <li class="page-item <%= currentPage === totalPages ? 'disabled' : '' %>">
+                        <a class="page-link" href="?page=<%= currentPage+1 %><%= filterKelas ? '&kelas='+filterKelas : '' %>">Next</a>
+                    </li>
+                </ul>
+            </nav>
+            <% } %>
+            <div class="text-muted mt-2">Menampilkan <%= siswa.length %> dari total <%= total %> siswa</div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Tambah Siswa -->
+<div class="modal fade" id="tambahModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="/admin/siswa/tambah" method="POST">
+                <div class="modal-header bg-primary text-white"><h5 class="modal-title"><i class="bi bi-person-plus"></i> Tambah Siswa</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <div class="mb-3"><label>NIS <span class="text-danger">*</span></label><input type="text" name="nis" class="form-control" required></div>
+                    <div class="mb-3"><label>Nama Lengkap <span class="text-danger">*</span></label><input type="text" name="nama" class="form-control" required></div>
+                    <div class="mb-3"><label>Kelas</label><select name="kelas" class="form-select"><option value="">-- Pilih Kelas --</option><% kelasList.forEach(k => { %><option value="<%= k.nama_kelas %>"><%= k.nama_kelas %></option><% }) %></select></div>
+                    <div class="mb-3"><label>PIN Ujian</label><input type="text" name="pin_ujian" class="form-control" value="1234"></div>
+                </div>
+                <div class="modal-footer"><button type="submit" class="btn btn-primary">Simpan</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Import Excel -->
+<div class="modal fade" id="importModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="/admin/siswa/import" method="POST" enctype="multipart/form-data">
+                <div class="modal-header bg-success text-white"><h5 class="modal-title"><i class="bi bi-file-excel"></i> Import Siswa</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <div class="mb-3"><label>File Excel (.xlsx)</label><input type="file" name="file_excel" class="form-control" accept=".xlsx" required></div>
+                    <small class="text-muted">Format: NIS, Nama, Kelas, PIN_UJIAN (baris pertama header). <a href="/admin/siswa/template">Download template</a></small>
+                </div>
+                <div class="modal-footer"><button type="submit" class="btn btn-success">Upload & Import</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<%- include('../partials/footer') %>

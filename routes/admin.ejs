@@ -1,0 +1,54 @@
+const express = require('express');
+const router = express.Router();
+const pool = require('../models/db');
+const { isAdmin } = require('../middleware/auth');
+
+// Middleware untuk semua route admin
+router.use(isAdmin);
+
+// Dashboard
+router.get('/dashboard', async (req, res) => {
+    try {
+        const [guru] = await pool.query('SELECT COUNT(*) as total FROM guru');
+        const [siswa] = await pool.query('SELECT COUNT(*) as total FROM siswa');
+        const [ujian] = await pool.query('SELECT COUNT(*) as total FROM ujian');
+        const [soal] = await pool.query('SELECT COUNT(*) as total FROM soal');
+        res.render('admin/dashboard', {
+            totalGuru: guru[0].total,
+            totalSiswa: siswa[0].total,
+            totalUjian: ujian[0].total,
+            totalSoal: soal[0].total
+        });
+    } catch (err) {
+        console.error(err);
+        res.send('Error loading dashboard');
+    }
+});
+
+// CRUD Guru (contoh sederhana)
+router.get('/guru', async (req, res) => {
+    const [guru] = await pool.query('SELECT * FROM guru');
+    res.render('admin/guru', { guru });
+});
+
+router.post('/guru/tambah', async (req, res) => {
+    const { nip, nama, username, password } = req.body;
+    const bcrypt = require('bcrypt');
+    const hashed = await bcrypt.hash(password, 10);
+    await pool.query('INSERT INTO guru (nip, nama, username, password) VALUES (?, ?, ?, ?)', [nip, nama, username, hashed]);
+    res.redirect('/admin/guru');
+});
+
+router.get('/guru/hapus/:id', async (req, res) => {
+    await pool.query('DELETE FROM guru WHERE id = ?', [req.params.id]);
+    res.redirect('/admin/guru');
+});
+
+// Untuk route lain (kelas, mapel, ujian, soal, hasil) akan diisi nanti
+router.get('/kelas', (req, res) => res.send('Halaman Kelas (segera)'));
+router.get('/mapel', (req, res) => res.send('Halaman Mapel (segera)'));
+router.get('/ujian', (req, res) => res.send('Halaman Ujian (segera)'));
+router.get('/soal', (req, res) => res.send('Halaman Soal (segera)'));
+router.get('/hasil', (req, res) => res.send('Halaman Hasil (segera)'));
+
+module.exports = router;

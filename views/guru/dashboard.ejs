@@ -1,0 +1,177 @@
+<%- include('../partials/header', { title: 'Dashboard Guru' }) %>
+<%- include('../partials/sidebar_guru') %>
+
+<div class="container-fluid">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-speedometer2"></i> Dashboard Guru</h1>
+        <div>
+            <span class="badge bg-success fs-6 p-2"><i class="bi bi-person-circle"></i> <%= session.guruNama %></span>
+        </div>
+    </div>
+
+    <!-- Statistik Cards -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Mata Pelajaran Diajar</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800"><%= pengajaran.length %></div>
+                        </div>
+                        <div class="col-auto"><i class="bi bi-book-fill fs-1 text-gray-300"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Total Ujian</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800"><%= totalUjian %></div>
+                        </div>
+                        <div class="col-auto"><i class="bi bi-calendar-check fs-1 text-gray-300"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Total Soal</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800"><%= totalSoal %></div>
+                        </div>
+                        <div class="col-auto"><i class="bi bi-question-circle fs-1 text-gray-300"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Siswa Mengerjakan</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800"><%= totalSiswaUjian %></div>
+                        </div>
+                        <div class="col-auto"><i class="bi bi-people fs-1 text-gray-300"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rata-rata Nilai & Mata Pelajaran -->
+    <div class="row mb-4">
+        <div class="col-xl-4 col-md-6 mb-3">
+            <div class="card shadow h-100 py-2">
+                <div class="card-body text-center">
+                    <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Rata-rata Nilai Keseluruhan</div>
+                    <div class="display-4 font-weight-bold text-success"><%= rataRataNilai %></div>
+                    <div class="small text-muted">Dari semua ujian yang diajar</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-8 col-md-6 mb-3">
+            <div class="card shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Mata Pelajaran yang Diajar</div>
+                    <div class="row mt-2">
+                        <% pengajaran.forEach(p => { %>
+                            <div class="col-md-4 mb-2">
+                                <span class="badge bg-primary p-2 fs-6 w-100">
+                                    <i class="bi bi-journal-bookmark-fill"></i> <%= p.nama_mapel %> - <%= p.nama_kelas %>
+                                </span>
+                            </div>
+                        <% }) %>
+                        <% if (pengajaran.length === 0) { %>
+                            <div class="col-12 text-muted">Belum ada mata pelajaran yang diajar. Hubungi admin untuk assign pengajaran.</div>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ujian Terbaru -->
+    <div class="row">
+        <div class="col-lg-7 mb-4">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <i class="bi bi-calendar-check"></i> Ujian Terbaru
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Ujian</th><th>Mapel</th><th>Kelas</th>
+                                    <th>Tanggal</th><th>Peserta</th><th>Rata-rata</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% ujianTerbaru.forEach(u => { %>
+                                <tr>
+                                    <td><%= u.nama_ujian %></td>
+                                    <td><%= u.nama_mapel %></td>
+                                    <td><%= u.nama_kelas %></td>
+                                    <td class="text-nowrap"><small><%= new Date(u.tanggal_mulai).toLocaleDateString() %></small></td>
+                                    <td class="text-center"><%= u.jumlah_peserta || 0 %></td>
+                                    <td class="text-center">
+                                        <span class="badge <%= (u.rata_nilai || 0) >= 70 ? 'bg-success' : (u.rata_nilai || 0) >= 50 ? 'bg-warning' : 'bg-danger' %>">
+                                            <%= Math.round(u.rata_nilai || 0) %>
+                                        </span>
+                                    </td>
+                                </tr>
+                                <% }) %>
+                                <% if (ujianTerbaru.length === 0) { %>
+                                    <tr><td colspan="6" class="text-center">Belum ada ujian</td></tr>
+                                <% } %>
+                            </tbody>
+                        </table>
+                    </div>
+                    <a href="/guru/kelola-soal" class="btn btn-sm btn-primary mt-2"><i class="bi bi-pencil-square"></i> Kelola Soal</a>
+                    <a href="/guru/hasil-siswa" class="btn btn-sm btn-info mt-2"><i class="bi bi-bar-chart"></i> Lihat Hasil</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Log Kecurangan Terbaru -->
+        <div class="col-lg-5 mb-4">
+            <div class="card shadow">
+                <div class="card-header bg-danger text-white">
+                    <i class="bi bi-exclamation-triangle"></i> Log Kecurangan Terbaru
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover">
+                            <thead class="table-light">
+                                <tr><th>Waktu</th><th>Siswa</th><th>Ujian</th><th>Jenis</th></tr>
+                            </thead>
+                            <tbody>
+                                <% logTerbaru.forEach(log => { %>
+                                <tr>
+                                    <td class="text-nowrap"><small><%= new Date(log.timestamp).toLocaleDateString() %></small></td>
+                                    <td><%= log.siswa_nama %><br><small class="text-muted"><%= log.nis %></small></td>
+                                    <td><%= log.nama_ujian %></td>
+                                    <td><span class="badge bg-warning"><%= log.jenis_kecurangan.replace('_', ' ') %></span></td>
+                                </tr>
+                                <% }) %>
+                                <% if (logTerbaru.length === 0) { %>
+                                    <td><td colspan="4" class="text-center">Belum ada kecurangan</td></tr>
+                                <% } %>
+                            </tbody>
+                        </table>
+                    </div>
+                    <a href="/guru/log-kecurangan" class="btn btn-sm btn-danger mt-2"><i class="bi bi-eye"></i> Lihat Semua</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<%- include('../partials/footer') %>

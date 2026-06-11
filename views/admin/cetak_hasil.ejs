@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Laporan Hasil Ujian - <%= ujian.nama_ujian %></title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 12px; margin: 20px; }
+        h1 { text-align: center; }
+        .header { margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th, td { border: 1px solid #999; padding: 6px; text-align: left; vertical-align: top; }
+        th { background: #f2f2f2; }
+        .page-break { page-break-before: always; }
+        .soal-detail { margin-top: 10px; }
+        .soal-detail table { width: 100%; }
+        .badge-benar { color: green; font-weight: bold; }
+        .badge-salah { color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+<h1>Laporan Hasil Ujian</h1>
+<div class="header">
+    <p><strong>Ujian:</strong> <%= ujian.nama_ujian %></p>
+    <p><strong>Tanggal:</strong> <%= new Date().toLocaleString() %></p>
+</div>
+
+<% siswaList.forEach(siswa => { %>
+    <div style="margin-bottom: 30px;">
+        <h3>Siswa: <%= siswa.nama %> (NIS: <%= siswa.nis %>) - Kelas: <%= siswa.kelas %></h3>
+        <p>Nilai: <strong><%= siswa.nilai %></strong> | Benar: <%= siswa.benar %> | Salah: <%= siswa.salah %> | Kosong: <%= siswa.kosong %> | Selesai: <%= new Date(siswa.selesai).toLocaleString() %></p>
+        <div class="soal-detail">
+            <table>
+                <thead>
+                    <tr><th>No</th><th>Soal</th><th>Jawaban Benar</th><th>Jawaban Siswa</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                    <% siswa.jawaban.forEach((jawab, idx) => { %>
+                    <tr>
+                        <td><%= idx+1 %></td>
+                        <td><%= jawab.teks_soal %></td>
+                        <td><%= jawab.jawaban_benar %></td>
+                        <td><%= jawab.jawaban_siswa || '(kosong)' %></td>
+                        <td class="<%= jawab.is_benar === 1 ? 'badge-benar' : 'badge-salah' %>">
+                            <%= jawab.is_benar === 1 ? 'Benar' : (jawab.is_benar === 0 ? 'Salah' : 'Kosong') %>
+                        </td>
+                    </tr>
+                    <% }) %>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <% if (siswaList.length > 1) { %><div class="page-break"></div><% } %>
+<% }) %>
+</body>
+</html>
