@@ -1,166 +1,121 @@
-# 🖥️ CBT Sekolah - Computer Based Test untuk MTs. AL-IHSAN BATUJAJAR
+# CBT Sekolah
 
-Sistem Ujian Berbasis Komputer (CBT) lengkap dengan tiga peran (Admin, Guru, Siswa), dukungan tiga tipe soal (Pilihan Ganda, Menjodohkan, Essay), deteksi kecurangan real-time, penyimpanan offline, dan laporan export Excel/PDF.
+> Sistem Computer Based Test untuk sekolah dengan dukungan ujian daring, penyimpanan jawaban offline, dan pemantauan aktivitas peserta secara real-time.
 
-## ✨ Fitur Utama
+CBT Sekolah dikembangkan untuk MTs Al-Ihsan Batujajar dan menyediakan alur terpisah bagi admin, guru, serta siswa.
 
-### 👨‍💻 Admin
-- Manajemen Guru, Siswa, Kelas, Mata Pelajaran
-- CRUD Ujian & Soal (3 tipe + import batch via tabel)
-- Reset ujian (perorangan/massal)
-- Hasil ujian dengan filter, pagination, export Excel (ringkasan & detail)
-- Cetak laporan PDF (print-friendly)
-- Log kecurangan (pindah tab, copy-paste)
-- Import siswa via Excel
+## Fitur utama
 
-### 👩‍🏫 Guru
-- Dashboard dengan statistik (ujian diajar, soal, peserta, rata-rata nilai)
-- Kelola soal (hanya untuk ujian yang diajar)
-- Lihat hasil siswa (filter per ujian/kelas, export Excel)
-- Log kecurangan untuk mata pelajaran yang diajar
+### Admin
 
-### 🧑‍🎓 Siswa
-- Login dengan NIS + PIN + pilih ujian
-- Tampilan ujian minimalis (timer, progress bar, toast notifikasi)
-- Tiga tipe soal: Pilihan Ganda, Menjodohkan, Essay
-- **Penyimpanan offline** (jawaban disimpan di localStorage, dikirim saat koneksi pulih)
-- Deteksi kecurangan: **pindah tab** & **copy-paste** (dibatasi konfigurasi per ujian)
-- Paksa submit jika batas pelanggaran terlampaui
+- Mengelola guru, siswa, kelas, mata pelajaran, ujian, dan soal.
+- Mendukung soal pilihan ganda, menjodohkan, dan esai.
+- Import siswa serta input soal secara batch.
+- Melihat hasil, melakukan reset ujian, dan mengekspor laporan.
+- Memantau log perpindahan tab dan aktivitas copy-paste.
 
-## 🛠️ Teknologi
+### Guru
 
-| Stack | Keterangan |
-|-------|-------------|
-| **Backend** | Node.js, Express.js, Socket.io |
-| **Database** | MySQL (MariaDB) |
-| **Template Engine** | EJS |
-| **Frontend** | Bootstrap 5, Bootstrap Icons, CSS3 |
-| **Real-time** | Socket.io (deteksi pindah tab, paksa submit) |
-| **Export** | ExcelJS (Excel), Print-friendly (PDF) |
-| **Keamanan** | Bcrypt, express-session, prepared statements |
+- Mengelola soal untuk mata pelajaran yang diampu.
+- Melihat statistik, hasil siswa, dan log aktivitas ujian.
+- Mengekspor hasil sesuai ujian dan kelas.
 
-## 📦 Instalasi
+### Siswa
 
-### Prasyarat
-- Node.js (v18+)
-- MySQL (MariaDB)
-- NPM
+- Login menggunakan NIS dan PIN.
+- Mengerjakan ujian dengan timer dan indikator progres.
+- Menyimpan jawaban pada `localStorage` ketika koneksi terputus.
+- Mengirim ulang jawaban setelah koneksi tersedia.
+- Melihat hasil setelah ujian selesai sesuai konfigurasi.
 
-### Langkah-langkah
+## Teknologi
 
-1. **Clone / download proyek** ke folder `D:\CBT-Sekolah` (atau sesuai keinginan).
+| Bagian | Teknologi |
+| --- | --- |
+| Backend | Node.js, Express.js |
+| Real-time | Socket.io |
+| Database | MySQL atau MariaDB |
+| Frontend | EJS, Bootstrap 5, JavaScript |
+| Export | ExcelJS dan tampilan print-friendly |
+| Keamanan | bcrypt, session, prepared statements |
 
-2. **Import database**  
-   - Buka phpMyAdmin, buat database baru `cbt_sekolah`
-   - Import file `cbt_sekolah.sql` yang disertakan
+## Persyaratan
 
-3. **Instal dependensi**
-   ```bash
-   npm install
-Konfigurasi environment
-Buat file .env di root proyek:
+- Node.js 18 atau lebih baru
+- npm
+- MySQL atau MariaDB
 
-env
+## Instalasi
+
+```bash
+git clone https://github.com/ilhamrizqiawan21/CBT-Sekolah.git
+cd CBT-Sekolah
+npm install
+```
+
+Buat file `.env` berdasarkan konfigurasi lingkungan lokal:
+
+```env
 PORT=3000
-DB_HOST=localhost
+DB_HOST=127.0.0.1
 DB_USER=root
 DB_PASSWORD=
 DB_NAME=cbt_sekolah
-SESSION_SECRET=rahasia_banget_cbt_sekolah
+SESSION_SECRET=ganti-dengan-secret-yang-kuat
 NODE_ENV=development
-Jalankan server
+```
 
-bash
-npm run dev   # menggunakan nodemon (auto restart)
-# atau
+Buat database, lalu import schema SQL yang tersedia di repository. Jangan gunakan data produksi atau data pribadi siswa pada lingkungan pengembangan.
+
+Jalankan aplikasi:
+
+```bash
+npm run dev
+```
+
+Jika script development tidak tersedia:
+
+```bash
 node app.js
-Akses aplikasi
+```
 
-Siswa: http://localhost:3000/login
+Akses aplikasi melalui `http://localhost:3000`.
 
-Admin: http://localhost:3000/login-admin
+## Struktur proyek
 
-Guru: http://localhost:3000/login-guru
-
-Akun Default
-Role	Username	Password
-Admin	admin	admin123 (atau sesuai reset)
-Guru	(buat melalui admin)	(sesuai input)
-Siswa	NIS: 12345, PIN: 1234	-
-Catatan: Password admin di database sudah di-hash. Jika tidak bisa login, gunakan endpoint reset sementara (lihat kode app.js).
-
-📁 Struktur Proyek
-text
+```text
 CBT-Sekolah/
-├── app.js                # Entry point, socket.io, middleware
-├── .env                  # Konfigurasi
-├── package.json
-├── models/
-│   └── db.js             # Koneksi MySQL pool
-├── routes/
-│   ├── index.js          # Login siswa, admin, guru
-│   ├── admin.js          # CRUD semua entitas, export, reset
-│   ├── guru.js           # Kelola soal, hasil, log
-│   └── api.js            # Endpoint untuk ujian siswa (soal, jawaban, selesai)
-├── controllers/
-│   └── authController.js # Login siswa
-├── views/
-│   ├── partials/         # header, sidebar_admin, sidebar_guru, footer
-│   ├── admin/            # dashboard, guru, kelas, mapel, ujian, soal, hasil, log, dll
-│   ├── guru/             # dashboard, kelola_soal, hasil_siswa, log_kecurangan
-│   ├── login.ejs, login-admin.ejs, login-guru.ejs
-│   └── ujian.ejs         # Halaman ujian siswa
-├── public/
-│   ├── css/              # style.css
-│   ├── js/               # ujian.js, admin.js, guru.js
-│   └── images/           # logo-sekolah.png, favicon.png
-├── utils/
-│   ├── helper.js         # cekWaktuUjian
-│   └── excelExport.js    # Export ke Excel
-└── middleware/
-    └── auth.js           # isAdmin, isGuru, isSiswaAPI
-🧪 Uji Coba
-Login sebagai siswa
+├── controllers/    # Logika autentikasi dan request
+├── middleware/     # Pemeriksaan role dan session
+├── models/         # Koneksi serta akses database
+├── public/         # CSS, JavaScript, dan gambar
+├── routes/         # Route admin, guru, siswa, dan API
+├── utils/          # Helper dan export
+├── views/          # Template EJS
+├── app.js          # Entry point aplikasi
+└── package.json
+```
 
-NIS: 12345, PIN: 1234, pilih ujian "Try Out Ujian CBT"
+## Pengujian manual
 
-Jawab soal, timer berjalan, coba pindah tab / copy-paste → muncul peringatan.
+1. Buat pengguna dan ujian melalui akun admin.
+2. Tetapkan guru, mata pelajaran, kelas, serta peserta.
+3. Login sebagai siswa dan kerjakan setiap tipe soal.
+4. Putuskan koneksi sementara untuk memeriksa penyimpanan offline.
+5. Periksa pengiriman ulang jawaban setelah koneksi pulih.
+6. Verifikasi hasil, export, reset ujian, dan log aktivitas.
 
-Matikan WiFi, jawab soal → tersimpan di localStorage, kirim ulang saat online.
+Repository ini belum mendokumentasikan automated test. Pengujian manual diperlukan sebelum deployment.
 
-Selesai ujian, nilai muncul.
+## Catatan keamanan
 
-Login sebagai admin
+- Gunakan `SESSION_SECRET` yang unik dan kuat.
+- Aktifkan HTTPS serta secure cookie pada production.
+- Hapus akun, endpoint reset, dan data demo sebelum deployment.
+- Batasi ukuran dan jenis file import.
+- Pastikan otorisasi diperiksa pada server, bukan hanya pada tampilan.
+- Lakukan backup database sebelum reset ujian massal.
 
-Buka menu Ujian → tambah ujian baru.
+## Lisensi
 
-Menu Soal → tambah soal (PG / Menjodohkan / Essay) manual atau via batch.
-
-Menu Hasil Ujian → filter ujian, export Excel detail, cetak PDF, reset per siswa.
-
-Menu Log Kecurangan → lihat riwayat pelanggaran.
-
-Login sebagai guru
-
-Pastikan admin telah assign pengajaran (guru-mapel-kelas).
-
-Kelola soal, lihat hasil siswa, lihat log kecurangan.
-
-🔒 Keamanan & Catatan
-Semua query menggunakan prepared statement (mysql2 pool) untuk mencegah SQL injection.
-
-Password di-hash dengan bcrypt.
-
-Session menggunakan express-session dengan cookie maxAge 1 hari.
-
-Untuk production, aktifkan NODE_ENV=production, gunakan HTTPS, dan batasi akses dengan reverse proxy (Nginx).
-
-Folder uploads/ digunakan sementara untuk import Excel (hapus berkala).
-
-🤝 Kontribusi
-Proyek ini dikembangkan untuk MTs. AL-IHSAN BATUJAJAR. Jika ingin mengembangkan lebih lanjut, silakan fork dan pull request.
-
-📄 Lisensi
-MIT License - bebas digunakan untuk tujuan pendidikan dan non-komersial.
-
-Selamat menggunakan! 🎉
+Lihat file lisensi repository jika tersedia. Penggunaan data sekolah harus mengikuti kebijakan privasi institusi.
