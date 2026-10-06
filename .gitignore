@@ -6,6 +6,7 @@ vendor/
 node_modules/
 **/node_modules/
 *.sql
+!database/schema.sql
 *.sqlite
 *.sqlite3
 backups/
