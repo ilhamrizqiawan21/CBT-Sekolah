@@ -221,12 +221,16 @@ router.get('/soal/:ujianId', isSiswaAPI, async (req, res) => {
             }
             else if (s.tipe_soal === 'menjodohkan') {
                 try {
+                    // Pasangan benar TIDAK dikirim ke klien: hanya daftar kiri dan
+                    // opsi kanan (+ pengecoh) yang selalu diacak (urutan asli = kunci).
                     const opsi = JSON.parse(s.opsi_tambahan || '{}');
-                    result.pasangan = opsi.pasangan || [];
-                    result.pengecoh = opsi.pengecoh || [];
+                    const pasangan = opsi.pasangan || [];
+                    const kanan = [...new Set([...pasangan.map(p => p.kanan), ...(opsi.pengecoh || [])])];
+                    result.kiri = pasangan.map(p => p.kiri);
+                    result.opsi_kanan = seededShuffle(kanan, mulberry32(seed ^ s.id));
                 } catch {
-                    result.pasangan = [];
-                    result.pengecoh = [];
+                    result.kiri = [];
+                    result.opsi_kanan = [];
                 }
             }
             // Essay: tidak ada field tambahan yang perlu dikirim ke client
@@ -252,15 +256,7 @@ function hitungIsBenar(soal, jawaban) {
         return jUser === jBenar ? 1 : 0;
     }
     if (tipe === 'menjodohkan') {
-        try {
-            const jUser = typeof jawaban === 'string' ? JSON.parse(jawaban || '[]') : (jawaban || []);
-            const jBenar = JSON.parse(soal.jawaban_benar || '[]');
-            if (!Array.isArray(jUser) || !Array.isArray(jBenar)) return 0;
-            const sortPairs = arr => [...arr].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
-            return JSON.stringify(sortPairs(jUser)) === JSON.stringify(sortPairs(jBenar)) ? 1 : 0;
-        } catch {
-            return 0;
-        }
+        return require('../services/penilaianService').cekJawabanMenjodohkan(jawaban, soal.jawaban_benar) ? 1 : 0;
     }
     if (tipe === 'essay') {
         // D-006: Essay dijawab di kertas, dinilai guru per soal (0–4)
@@ -373,8 +369,10 @@ router.post('/sinkron-jawaban', isSiswaAPI, async (req, res) => {
             const soal = soalMap.get(sid);
 
             const rawTs = item.client_ts ? new Date(item.client_ts) : now;
-            // Klien tidak boleh mengklaim waktu di masa depan (mengunci jawaban berikutnya)
-            const clientTs = isNaN(rawTs.getTime()) || rawTs.getTime() > now.getTime() ? now : rawTs;
+            // Klien tidak boleh mengklaim waktu di masa depan (mengunci jawaban berikutnya).
+            // Truncate milidetik ke 0 karena kolom MySQL DATETIME hanya presisi detik (mencegah pembulatan ke detik berikutnya).
+            const boundedTs = isNaN(rawTs.getTime()) || rawTs.getTime() > now.getTime() ? now : rawTs;
+            const clientTs = new Date(Math.floor(boundedTs.getTime() / 1000) * 1000);
 
             // Cek apakah jawaban boleh diterima (timer & grace period)
             const izin = sesiService.bolehTerimaJawaban(sesi, clientTs, now);
@@ -383,12 +381,13 @@ router.post('/sinkron-jawaban', isSiswaAPI, async (req, res) => {
                 continue;
             }
 
-            // Cek client_ts: timestamp yang lebih lama TIDAK boleh menimpa yang lebih baru
+            // Cek client_ts: timestamp yang lebih lama TIDAK boleh menimpa yang lebih baru.
+            // Gunakan presisi detik karena tipe kolom MySQL DATETIME menyimpan presisi per detik.
             const existing = existingMap.get(sid);
             if (existing && existing.client_ts) {
-                const existingTime = new Date(existing.client_ts).getTime();
-                const incomingTime = clientTs.getTime();
-                if (incomingTime < existingTime) {
+                const existingSec = Math.floor(new Date(existing.client_ts).getTime() / 1000);
+                const incomingSec = Math.floor(clientTs.getTime() / 1000);
+                if (incomingSec < existingSec) {
                     diabaikanCount++;
                     continue;
                 }
@@ -519,17 +518,8 @@ router.post('/simpan-jawaban', isSiswaAPI, async (req, res) => {
             } catch { isBenar = 0; }
         }
         else if (tipe === 'essay') {
-            try {
-                const opsi      = JSON.parse(soal[0].opsi_tambahan || '{}');
-                const kataKunci = opsi.kata_kunci || [];
-                if (kataKunci.length === 0) {
-                    isBenar = 0;
-                } else {
-                    const jawabanLower = String(jawaban).toLowerCase();
-                    const cocok = kataKunci.filter(k => jawabanLower.includes(k.toLowerCase())).length;
-                    isBenar = (cocok / kataKunci.length) >= 0.6 ? 1 : 0;
-                }
-            } catch { isBenar = 0; }
+            // T3.3, D-006: Essay dijawab di lembar kertas dan dinilai guru secara manual (0..poin)
+            isBenar = null;
         }
 
         await pool.query(
@@ -566,7 +556,13 @@ router.post('/selesai-ujian', isSiswaAPI, async (req, res) => {
     try {
         const { finalizeSesi } = require('../services/finalizeService');
         const hasil = await finalizeSesi(siswa_id, ujian_id, pool);
-        res.json(hasil);
+
+        const tampilkanNilai = process.env.TAMPILKAN_NILAI_SISWA === 'true';
+        if (tampilkanNilai) {
+            res.json(hasil);
+        } else {
+            res.json({ success: true, message: 'Jawaban terkirim' });
+        }
     } catch (err) {
         console.error('POST /selesai-ujian error:', err);
         res.status(500).json({ error: 'Gagal simpan nilai' });

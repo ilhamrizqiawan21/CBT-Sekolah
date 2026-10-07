@@ -1,0 +1,187 @@
+<%- include('../partials/header', { title: 'Input Nilai Essay' }) %>
+<%- include('../partials/sidebar_guru') %>
+
+<div class="container-fluid">
+    <div class="d-sm-flex align-items-center justify-content-between mb-3">
+        <div>
+            <h1 class="h3 mb-1 text-gray-800"><i class="bi bi-pencil-square text-primary"></i> Penilaian Lembar Jawaban Essay</h1>
+            <p class="text-muted mb-0">Ujian: <strong><%= ujian.nama_ujian %></strong> | Mapel: <strong><%= ujian.nama_mapel %></strong> | Kelas: <strong><%= ujian.nama_kelas %></strong></p>
+        </div>
+        <div class="d-flex gap-2 mt-2 mt-sm-0">
+            <a href="/guru/essay" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Kembali
+            </a>
+            <a href="/guru/essay/<%= ujian.id %>/export" class="btn btn-outline-success">
+                <i class="bi bi-file-earmark-excel"></i> Download Excel
+            </a>
+            <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalImportExcel">
+                <i class="bi bi-upload"></i> Upload Excel
+            </button>
+        </div>
+    </div>
+
+    <!-- Notifikasi -->
+    <% if (msg) { %>
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="bi bi-check-circle me-1"></i> <%= msg %>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    <% } %>
+    <% if (error) { %>
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle me-1"></i> <%= error %>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    <% } %>
+
+    <div class="alert alert-secondary py-2"><i class="bi bi-info-circle me-1"></i> Hanya siswa yang sudah selesai mengerjakan yang ditampilkan.</div>
+
+    <!-- Accordion Daftar Soal Essay -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 bg-light" data-bs-toggle="collapse" data-bs-target="#daftarSoalCollapse" style="cursor: pointer;">
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="m-0 font-weight-bold text-dark">
+                    <i class="bi bi-journal-text text-primary me-1"></i> Pratinjau Teks Soal Essay (<%= soalList.length %> Soal)
+                </h6>
+                <small class="text-primary"><i class="bi bi-chevron-down"></i> Klik untuk buka/tutup</small>
+            </div>
+        </div>
+        <div class="collapse" id="daftarSoalCollapse">
+            <div class="card-body">
+                <div class="row g-3">
+                    <% soalList.forEach((s, idx) => { %>
+                        <div class="col-md-6">
+                            <div class="p-3 border rounded bg-light h-100">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <strong class="text-primary">Soal #<%= idx + 1 %></strong>
+                                    <span class="badge bg-secondary">Maks: <%= s.poin %> Poin</span>
+                                </div>
+                                <div dir="auto" style="white-space: pre-wrap;"><%= s.teks_soal %></div>
+                            </div>
+                        </div>
+                    <% }) %>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabel Matriks Penilaian Siswa -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 bg-primary text-white d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold"><i class="bi bi-people-fill me-1"></i> Input Nilai Siswa</h6>
+            <small class="text-white-50">Rentang skor: 0 sampai poin maksimal soal. Nilai akhir dihitung otomatis setelah disimpan.</small>
+        </div>
+        <div class="card-body">
+            <% if (siswaList && siswaList.length > 0) { %>
+                <form action="/guru/essay/<%= ujian.id %>" method="POST" id="formNilaiEssay">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 40px;" class="text-center">No</th>
+                                    <th style="width: 100px;">NIS</th>
+                                    <th>Nama Siswa</th>
+                                    <th style="width: 90px;">Kelas</th>
+                                    <% soalList.forEach((s, idx) => { %>
+                                        <th class="text-center" style="min-width: 110px;">
+                                            <div>Soal #<%= idx + 1 %></div>
+                                            <small class="badge bg-secondary">Maks <%= s.poin %></small>
+                                        </th>
+                                    <% }) %>
+                                    <th class="text-center" style="width: 100px;">Poin PG+Jodoh</th>
+                                    <th class="text-center" style="width: 90px;">Poin Essay</th>
+                                    <th class="text-center" style="width: 90px;">Nilai Akhir</th>
+                                    <th class="text-center" style="width: 120px;">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% siswaList.forEach((sw, sIdx) => { 
+                                    const studentSkor = skorMap[sw.siswa_id] || {};
+                                %>
+                                <tr>
+                                    <td class="text-center"><%= sIdx + 1 %></td>
+                                    <td><%= sw.nis %></td>
+                                    <td><strong><%= sw.nama %></strong></td>
+                                    <td><%= sw.kelas || '-' %></td>
+                                    <% soalList.forEach((s) => { 
+                                        const currentVal = studentSkor[s.id] !== undefined ? studentSkor[s.id] : '';
+                                    %>
+                                        <td class="text-center">
+                                            <input type="number" 
+                                                   name="skor[s_<%= sw.siswa_id %>][q_<%= s.id %>]" 
+                                                   class="form-control form-control-sm text-center mx-auto"
+                                                   min="0" 
+                                                   max="<%= s.poin %>" 
+                                                   step="1"
+                                                   value="<%= currentVal %>"
+                                                   placeholder="0 - <%= s.poin %>"
+                                                   style="max-width: 90px;"
+                                                   required>
+                                        </td>
+                                    <% }) %>
+                                    <td class="text-center"><%= sw.poin_otomatis ?? 0 %></td>
+                                    <td class="text-center fw-bold text-primary"><%= sw.poin_essay ?? 0 %></td>
+                                    <td class="text-center">
+                                        <span class="badge bg-dark fs-6"><%= sw.nilai ?? 0 %></span>
+                                    </td>
+                                    <td class="text-center">
+                                        <% if (sw.status_koreksi === 'selesai') { %>
+                                            <span class="badge bg-success">Selesai</span>
+                                        <% } else { %>
+                                            <span class="badge bg-warning text-dark">Menunggu</span>
+                                        <% } %>
+                                    </td>
+                                </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top">
+                        <span class="text-muted"><i class="bi bi-info-circle"></i> Pastikan semua nilai telah terisi agar status penilaian menjadi <strong>Selesai</strong>.</span>
+                        <button type="submit" class="btn btn-primary px-4">
+                            <i class="bi bi-save me-1"></i> Simpan & Hitung Ulang Nilai
+                        </button>
+                    </div>
+                </form>
+            <% } else { %>
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-person-x fs-1 d-block mb-2 text-secondary"></i>
+                    Belum ada siswa yang mengikuti atau menyelesaikan ujian ini.
+                </div>
+            <% } %>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Import Excel -->
+<div class="modal fade" id="modalImportExcel" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="/guru/essay/<%= ujian.id %>/import" method="POST" enctype="multipart/form-data">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-upload text-primary me-2"></i> Import Nilai Essay dari Excel</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <small>
+                            <i class="bi bi-info-circle me-1"></i>
+                            Gunakan format file Excel (.xlsx) yang diunduh melalui tombol <strong>Download Excel</strong> agar kolom dan ID siswa cocok secara otomatis.
+                        </small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="file_excel" class="form-label font-weight-bold">Pilih Berkas Excel (.xlsx)</label>
+                        <input type="file" class="form-control" id="file_excel" name="file_excel" accept=".xlsx" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-cloud-arrow-up"></i> Upload & Simpan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<%- include('../partials/footer') %>

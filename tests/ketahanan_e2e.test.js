@@ -378,6 +378,7 @@ describe('Pengujian Ketahanan Sesi End-to-End (T1.10)', () => {
             assert.strictEqual(resLanjutJawab.statusCode, 200);
 
             // 6. Siswa menyelesaikan ujian secara normal
+            process.env.TAMPILKAN_NILAI_SISWA = 'true';
             const resSelesai = await makeRequest(instance.baseUrl, '/api/selesai-ujian', 'POST', {}, siswaCookie);
             assert.strictEqual(resSelesai.statusCode, 200);
             const jsonSelesai = JSON.parse(resSelesai.body);

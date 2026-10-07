@@ -190,7 +190,9 @@ async function kirimAntrian() {
         if (res.ok) {
             // Berhasil: hapus item yang terkirim dari antrean
             const currentQueue = getSyncQueue();
-            const remaining = currentQueue.slice(batch.length);
+            // Hapus hanya item yang persis terkirim (soal_id + client_ts sama). Jawaban yang diubah
+            // saat request berjalan (item diganti di antrean) harus tetap tinggal untuk dikirim lagi.
+            const remaining = currentQueue.filter(q => !batch.some(b => b.soal_id === q.soal_id && b.client_ts === q.client_ts));
             saveSyncQueue(remaining);
 
             backoffDelay = 2000; // Reset delay jika sukses
@@ -358,6 +360,28 @@ async function loadSoal() {
     }
 }
 
+function isArabic(text) {
+    if (!text) return false;
+    // Deteksi blok unicode huruf Arab
+    return /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFC]/.test(text);
+}
+
+function escapeHtml(v) {
+    return String(v === undefined || v === null ? '' : v)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// Jawaban menjodohkan disimpan sebagai JSON [{kiri, kanan}, ...] (format sama dengan kunci di server).
+function bacaPasanganTersimpan(savedValue) {
+    try {
+        const arr = typeof savedValue === 'string' ? JSON.parse(savedValue || '[]') : (savedValue || []);
+        const map = {};
+        if (Array.isArray(arr)) arr.forEach(p => { if (p && p.kiri !== undefined) map[p.kiri] = p.kanan; });
+        return map;
+    } catch { return {}; }
+}
+
 function renderSoal(soalList) {
     const container = document.getElementById('soal-container');
     if (!container) return;
@@ -369,12 +393,15 @@ function renderSoal(soalList) {
         div.className = 'soal-card';
         div.setAttribute('data-id', soal.id);
 
+        const soalIsAr = isArabic(soal.teks_soal);
+        const soalArClass = soalIsAr ? ' ar' : '';
+
         let html = `
             <div class="soal-header">
                 <span class="soal-number">Soal ${idx + 1}</span>
                 <span class="soal-poin"><i class="bi bi-star-fill"></i> ${soal.poin} poin</span>
             </div>
-            <div class="soal-text">${soal.teks_soal}</div>
+            <div class="soal-text${soalArClass}" dir="auto">${soal.teks_soal}</div>
         `;
 
         const savedValue = local[soal.id];
@@ -383,12 +410,14 @@ function renderSoal(soalList) {
             html += `<div class="pilihan-ganda">`;
             soal.pilihan.forEach(p => {
                 const isChecked = savedValue === p.key ? 'checked' : '';
+                const choiceIsAr = isArabic(p.text);
+                const choiceArClass = choiceIsAr ? ' ar' : '';
                 html += `
                     <div class="form-check" onclick="this.querySelector('input').click()">
                         <input class="form-check-input" type="radio"
                                name="soal_${soal.id}" value="${p.key}"
                                id="q_${soal.id}_${p.key}" ${isChecked}>
-                        <label class="form-check-label" for="q_${soal.id}_${p.key}">
+                        <label class="form-check-label${choiceArClass}" for="q_${soal.id}_${p.key}" dir="auto">
                             ${p.key}. ${p.text}
                         </label>
                     </div>`;
@@ -396,21 +425,25 @@ function renderSoal(soalList) {
             html += `</div>`;
         }
         else if (soal.tipe === 'menjodohkan') {
+            const tersimpan = bacaPasanganTersimpan(savedValue);
             html += `<div class="menjodohkan mb-3">
                 <label class="form-label fw-bold">
-                    <i class="bi bi-arrow-left-right"></i> Pasangkan pernyataan berikut:
-                </label>
-                <select class="form-select" name="soal_${soal.id}" id="select_${soal.id}">
-                    <option value="">-- Pilih Jawaban --</option>`;
-            (soal.pasangan || []).forEach(p => {
-                const isSelected = savedValue === p.kanan ? 'selected' : '';
-                html += `<option value="${p.kanan}" ${isSelected}>${p.kiri} → ${p.kanan}</option>`;
+                    <i class="bi bi-arrow-left-right"></i> Pasangkan setiap pernyataan dengan jawaban yang tepat:
+                </label>`;
+            (soal.kiri || []).forEach((kiri, i) => {
+                const kiriAr = isArabic(kiri) ? ' ar' : '';
+                html += `<div class="pasangan-baris mb-2">
+                    <div class="pasangan-kiri${kiriAr}" dir="auto">${i + 1}. ${escapeHtml(kiri)}</div>
+                    <select class="form-select pasangan-select" data-kiri="${escapeHtml(kiri)}" dir="auto"
+                            aria-label="Pasangan untuk ${escapeHtml(kiri)}">
+                        <option value="">-- Pilih Jawaban --</option>`;
+                (soal.opsi_kanan || []).forEach(kanan => {
+                    const isSelected = tersimpan[kiri] === kanan ? 'selected' : '';
+                    html += `<option value="${escapeHtml(kanan)}" ${isSelected}>${escapeHtml(kanan)}</option>`;
+                });
+                html += `</select></div>`;
             });
-            (soal.pengecoh || []).forEach(p => {
-                const isSelected = savedValue === p ? 'selected' : '';
-                html += `<option value="${p}" ${isSelected}>${p}</option>`;
-            });
-            html += `</select></div>`;
+            html += `</div>`;
         }
         else if (soal.tipe === 'essay') {
             // FR-09, D-006: Essay dijawab di kertas
@@ -433,8 +466,14 @@ function renderSoal(soalList) {
                 radio.addEventListener('change', () => simpanJawaban(soal.id, radio.value));
             });
         } else if (soal.tipe === 'menjodohkan') {
-            const sel = div.querySelector(`select[name="soal_${soal.id}"]`);
-            sel.addEventListener('change', () => simpanJawaban(soal.id, sel.value));
+            const selects = div.querySelectorAll('select.pasangan-select');
+            selects.forEach(sel => {
+                sel.addEventListener('change', () => {
+                    const pasangan = [];
+                    selects.forEach(s => { if (s.value) pasangan.push({ kiri: s.dataset.kiri, kanan: s.value }); });
+                    simpanJawaban(soal.id, pasangan.length ? JSON.stringify(pasangan) : '');
+                });
+            });
         }
     });
 }
@@ -547,6 +586,8 @@ async function selesaiUjian() {
                 `Salah      : ${data.salah}\n` +
                 `Kosong     : ${data.kosong}`
             );
+        } else {
+            alert(`✅ Ujian selesai!\n\n${data.message || 'Jawaban terkirim'}`);
         }
 
         socket.emit('selesai-ujian');
@@ -621,3 +662,68 @@ window.addEventListener('beforeunload', (e) => {
         e.returnValue = 'Anda sedang mengerjakan ujian. Yakin ingin meninggalkan halaman?';
     }
 });
+
+// ── Kontrol Ukuran Teks (A- / A+) (T2.2) ──
+(function initFontSizeControl() {
+    const FONT_SIZE_STORAGE_KEY = 'cbt_exam_font_scale';
+    const MIN_SCALE = 0.85;
+    const MAX_SCALE = 1.50;
+    const STEP = 0.10;
+
+    let currentScale = 1.0;
+    try {
+        const saved = localStorage.getItem(FONT_SIZE_STORAGE_KEY);
+        if (saved) {
+            const parsed = parseFloat(saved);
+            if (!isNaN(parsed) && parsed >= MIN_SCALE && parsed <= MAX_SCALE) {
+                currentScale = parsed;
+            }
+        }
+    } catch (_) {
+        // Abaikan jika localStorage dibatasi browser
+    }
+
+    function applyScale(scale) {
+        currentScale = Math.round(scale * 100) / 100;
+        document.documentElement.style.setProperty('--exam-font-scale', currentScale);
+        const label = document.getElementById('font-size-val');
+        if (label) {
+            label.textContent = `${Math.round(currentScale * 100)}%`;
+        }
+        try {
+            localStorage.setItem(FONT_SIZE_STORAGE_KEY, currentScale.toString());
+        } catch (_) {}
+    }
+
+    // Terapkan ukuran awal
+    applyScale(currentScale);
+
+    const btnDec = document.getElementById('btn-font-dec');
+    const btnInc = document.getElementById('btn-font-inc');
+
+    if (btnDec) {
+        btnDec.addEventListener('click', () => {
+            if (currentScale > MIN_SCALE + 0.01) {
+                applyScale(currentScale - STEP);
+            }
+        });
+    }
+
+    if (btnInc) {
+        btnInc.addEventListener('click', () => {
+            if (currentScale < MAX_SCALE - 0.01) {
+                applyScale(currentScale + STEP);
+            }
+        });
+    }
+})();
+
+// Tinggi topbar bisa berubah (membungkus di layar sempit); selaraskan offset konten.
+(function syncTopbarHeight() {
+    const bar = document.querySelector('.exam-topbar');
+    if (!bar) return;
+    const apply = () => document.documentElement.style.setProperty('--topbar-h', bar.offsetHeight + 'px');
+    apply();
+    if (window.ResizeObserver) new ResizeObserver(apply).observe(bar);
+    window.addEventListener('resize', apply);
+})();

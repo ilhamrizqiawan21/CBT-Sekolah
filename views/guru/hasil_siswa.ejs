@@ -121,7 +121,8 @@
                     <thead class="table-light">
                         <tr>
                             <th>NIS</th><th>Siswa</th><th>Kelas</th><th>Ujian</th><th>Mapel</th>
-                            <th>Nilai</th><th>Benar</th><th>Salah</th><th>Kosong</th>
+                            <th>Poin PG+Menjodohkan</th><th>Poin Essay</th><th>Nilai Akhir</th><th>Status Koreksi</th>
+                            <th>Benar</th><th>Salah</th><th>Kosong</th>
                             <th>Selesai</th>
                         </tr>
                     </thead>
@@ -140,7 +141,16 @@
                                 <td><%= h.nama_kelas || '-' %></td>
                                 <td><%= h.nama_ujian %></td>
                                 <td><%= h.nama_mapel %></td>
+                                <td class="text-center fw-bold"><%= h.poin_otomatis ?? 0 %></td>
+                                <td class="text-center fw-bold"><%= h.poin_essay ?? 0 %></td>
                                 <td class="text-center"><span class="badge <%= nilaiClass %> fs-6 p-2"><%= h.nilai %></span></td>
+                                <td class="text-center">
+                                    <% if (h.status_koreksi === 'selesai') { %>
+                                        <span class="badge bg-success">Selesai</span>
+                                    <% } else { %>
+                                        <span class="badge bg-warning text-dark">Menunggu Essay</span>
+                                    <% } %>
+                                </td>
                                 <td class="text-center"><span class="badge bg-success"><%= h.benar %></span></td>
                                 <td class="text-center"><span class="badge bg-danger"><%= h.salah %></span></td>
                                 <td class="text-center"><span class="badge bg-secondary"><%= h.kosong %></span></td>
@@ -148,7 +158,7 @@
                             </tr>
                             <% }) %>
                         <% } else { %>
-                            <tr><td colspan="11" class="text-center">Belum ada data hasil ujian untuk mata pelajaran yang Anda ajar</td></tr>
+                            <tr><td colspan="13" class="text-center">Belum ada data hasil ujian untuk mata pelajaran yang Anda ajar</td></tr>
                         <% } %>
                     </tbody>
                 </table>

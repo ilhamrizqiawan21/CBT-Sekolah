@@ -1,0 +1,88 @@
+<%- include('../partials/header', { title: 'Penilaian Essay' }) %>
+<%- include('../partials/sidebar_guru') %>
+
+<div class="container-fluid">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-pencil-fill text-primary"></i> Penilaian Soal Essay</h1>
+    </div>
+
+    <!-- Notifikasi -->
+    <% if (msg) { %>
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="bi bi-check-circle me-1"></i> <%= msg %>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    <% } %>
+    <% if (error) { %>
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle me-1"></i> <%= error %>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    <% } %>
+
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 bg-primary text-white d-flex align-items-center justify-content-between">
+            <h6 class="m-0 font-weight-bold"><i class="bi bi-list-check me-1"></i> Daftar Ujian dengan Soal Essay</h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 50px;">No</th>
+                            <th>Nama Ujian</th>
+                            <th>Mata Pelajaran</th>
+                            <th>Kelas</th>
+                            <th class="text-center">Jumlah Soal Essay</th>
+                            <th class="text-center">Peserta</th>
+                            <th class="text-center">Status Koreksi</th>
+                            <th class="text-center" style="width: 150px;">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% if (ujianList && ujianList.length > 0) { %>
+                            <% ujianList.forEach((u, idx) => { %>
+                            <tr>
+                                <td class="text-center"><%= idx + 1 %></td>
+                                <td><strong><%= u.nama_ujian %></strong></td>
+                                <td><%= u.nama_mapel %></td>
+                                <td><span class="badge bg-secondary"><%= u.nama_kelas %></span></td>
+                                <td class="text-center"><span class="badge bg-info text-dark fs-6"><%= u.jumlah_essay %> soal</span></td>
+                                <td class="text-center">
+                                    <span class="badge bg-light text-dark border">
+                                        <%= u.total_peserta %> siswa
+                                    </span>
+                                </td>
+                                <td class="text-center">
+                                    <% if (u.total_peserta === 0) { %>
+                                        <span class="badge bg-secondary">Belum ada peserta</span>
+                                    <% } else if (u.peserta_menunggu > 0) { %>
+                                        <span class="badge bg-warning text-dark"><%= u.peserta_menunggu %> Menunggu Koreksi</span>
+                                    <% } else { %>
+                                        <span class="badge bg-success">Semua Selesai</span>
+                                    <% } %>
+                                </td>
+                                <td class="text-center">
+                                    <a href="/guru/essay/<%= u.id %>" class="btn btn-sm btn-primary">
+                                        <i class="bi bi-pencil-square"></i> Nilai Essay
+                                    </a>
+                                </td>
+                            </tr>
+                            <% }) %>
+                        <% } else { %>
+                            <tr>
+                                <td colspan="8" class="text-center text-muted py-4">
+                                    <i class="bi bi-info-circle fs-3 d-block mb-2 text-secondary"></i>
+                                    Tidak ada ujian dengan soal essay pada mata pelajaran yang Anda ajar.
+                                </td>
+                            </tr>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<%- include('../partials/footer') %>
+

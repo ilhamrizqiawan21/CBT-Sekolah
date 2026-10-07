@@ -63,7 +63,7 @@
             <div class="card-body">
                 <div class="table-responsive">
                     <table class="table table-bordered">
-                        <thead><tr><th>No</th><th>Teks Soal</th><th>Kata Kunci</th><th>Poin</th><th>Aksi</th></tr></thead>
+                        <thead><tr><th>No</th><th>Teks Soal</th><th>Poin</th><th>Aksi</th></tr></thead>
                         <tbody id="tbodyEssay"></tbody>
                     </table>
                 </div>
@@ -106,20 +106,19 @@
         const tr = document.createElement('tr');
         tr.innerHTML = `<td class="text-center">${no}</td>`;
         if (section === 'PG') {
-            tr.innerHTML += `<td><textarea class="form-control teks_soal_pg" rows="2"></textarea></td>
-                <td><input class="form-control pilihan_a"></td><td><input class="form-control pilihan_b"></td>
-                <td><input class="form-control pilihan_c"></td><td><input class="form-control pilihan_d"></td>
+            tr.innerHTML += `<td><textarea class="form-control teks_soal_pg" rows="2" dir="auto"></textarea></td>
+                <td><input class="form-control pilihan_a" dir="auto"></td><td><input class="form-control pilihan_b" dir="auto"></td>
+                <td><input class="form-control pilihan_c" dir="auto"></td><td><input class="form-control pilihan_d" dir="auto"></td>
                 <td><select class="form-select jawaban_pg"><option value="">--</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option></select></td>
                 <td><input class="form-control poin_pg" value="1" style="width:70px"></td>`;
         } else if (section === 'Menjodohkan') {
-            tr.innerHTML += `<td><textarea class="form-control teks_soal_men" rows="2"></textarea></td>
-                <td><input class="form-control kiri" placeholder="Contoh: Pancasila ke-1"></td>
-                <td><input class="form-control kanan" placeholder="Contoh: Ketuhanan"></td>
+            tr.innerHTML += `<td><textarea class="form-control teks_soal_men" rows="2" dir="auto"></textarea></td>
+                <td><input class="form-control kiri" dir="auto" placeholder="Contoh: Pancasila ke-1"></td>
+                <td><input class="form-control kanan" dir="auto" placeholder="Contoh: Ketuhanan"></td>
                 <td><input class="form-control poin_men" value="2" style="width:70px"></td>`;
         } else {
-            tr.innerHTML += `<td><textarea class="form-control teks_soal_essay" rows="2"></textarea></td>
-                <td><input class="form-control kata_kunci" placeholder="kata1, kata2, kata3"></td>
-                <td><input class="form-control poin_essay" value="3" style="width:70px"></td>`;
+            tr.innerHTML += `<td><textarea class="form-control teks_soal_essay" rows="2" dir="auto"></textarea></td>
+                <td><input class="form-control poin_essay" value="4" style="width:70px"></td>`;
         }
         tr.innerHTML += `<td class="text-center"><button class="btn btn-sm btn-danger hapusBaris"><i class="bi bi-trash"></i></button></td>`;
         tbody.appendChild(tr);
@@ -142,7 +141,7 @@
                 pilihan_c: tr.querySelector('.pilihan_c')?.value || '',
                 pilihan_d: tr.querySelector('.pilihan_d')?.value || '',
                 jawaban_benar: tr.querySelector('.jawaban_pg')?.value || '',
-                poin: parseInt(tr.querySelector('.poin_pg')?.value) || 1
+                poin: parseInt(tr.querySelector('.poin_pg')?.value) || 2
             });
         });
         document.querySelectorAll('#tbodyMenjodohkan tr').forEach(tr => {
@@ -157,8 +156,7 @@
             if (!teks) return;
             soalEssay.push({
                 teks_soal: teks,
-                kata_kunci: tr.querySelector('.kata_kunci')?.value.split(',').map(k => k.trim()) || [],
-                poin: parseInt(tr.querySelector('.poin_essay')?.value) || 3
+                poin: parseInt(tr.querySelector('.poin_essay')?.value) || 4
             });
         });
         const pengecoh = document.getElementById('pengecoh')?.value.split(',').map(p => p.trim()).filter(p => p);
@@ -173,4 +171,5 @@
     });
 </script>
 
+<script src="/js/pratinjau.js"></script>
 <%- include('../partials/footer') %>

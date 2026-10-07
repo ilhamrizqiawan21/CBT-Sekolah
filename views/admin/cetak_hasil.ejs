@@ -26,7 +26,14 @@
 <% siswaList.forEach(siswa => { %>
     <div style="margin-bottom: 30px;">
         <h3>Siswa: <%= siswa.nama %> (NIS: <%= siswa.nis %>) - Kelas: <%= siswa.kelas %></h3>
-        <p>Nilai: <strong><%= siswa.nilai %></strong> | Benar: <%= siswa.benar %> | Salah: <%= siswa.salah %> | Kosong: <%= siswa.kosong %> | Selesai: <%= new Date(siswa.selesai).toLocaleString() %></p>
+        <p>
+            <strong>Nilai Akhir:</strong> <%= siswa.nilai ?? 0 %> | 
+            <strong>Poin PG+Menjodohkan:</strong> <%= siswa.poin_otomatis ?? 0 %> | 
+            <strong>Poin Essay:</strong> <%= siswa.poin_essay ?? 0 %> | 
+            <strong>Status Koreksi:</strong> <%= siswa.status_koreksi === 'selesai' ? 'Selesai' : 'Menunggu Essay' %> | 
+            Benar: <%= siswa.benar %> | Salah: <%= siswa.salah %> | Kosong: <%= siswa.kosong %> | 
+            Selesai: <%= siswa.selesai ? new Date(siswa.selesai).toLocaleString() : '-' %>
+        </p>
         <div class="soal-detail">
             <table>
                 <thead>

@@ -7,6 +7,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="/css/style.css" rel="stylesheet">
     <style>
         :root{
             --primary:#3b5bdb; --primary-light:#eef2ff; --primary-rgb:59,91,219;
@@ -16,13 +17,68 @@
             --bg:#f0f2f8; --card:#fff;
             --font-body:'DM Sans',sans-serif;
             --font-heading:'Sora',sans-serif;
+            --font-arabic:'Amiri',serif;
             --shadow-sm:0 2px 8px rgba(0,0,0,.07);
             --shadow-md:0 4px 20px rgba(0,0,0,.10);
             --radius:14px; --radius-sm:8px;
+            --exam-font-scale: 1;
         }
         *{ box-sizing:border-box; margin:0; padding:0; }
         html{ font-size:16px; }
         body{ font-family:var(--font-body); background:var(--bg); min-height:100vh; -webkit-font-smoothing:antialiased; }
+
+        /* Kontrol Ukuran Teks (A- / A+) (T2.2) */
+        .font-size-ctrl {
+            display: inline-flex;
+            align-items: center;
+            background: #f1f3f5;
+            border: 1px solid #dee2e6;
+            border-radius: 20px;
+            padding: 2px 4px;
+            gap: 2px;
+        }
+        .btn-font-size {
+            background: none;
+            border: none;
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: #495057;
+            cursor: pointer;
+            transition: all 0.18s;
+            padding: 0;
+        }
+        .btn-font-size:hover {
+            background: #fff;
+            color: var(--primary);
+            box-shadow: 0 1px 4px rgba(0,0,0,.1);
+        }
+        .btn-font-size:active {
+            transform: scale(0.92);
+        }
+        .font-size-label {
+            font-size: 0.68rem;
+            font-weight: 600;
+            color: #868e96;
+            padding: 0 3px;
+            user-select: none;
+        }
+
+        /* Terapkan skala font pada soal */
+        .soal-text {
+            font-size: calc(0.95rem * var(--exam-font-scale)) !important;
+        }
+        .form-check-label {
+            font-size: calc(0.88rem * var(--exam-font-scale)) !important;
+        }
+        .soal-text.ar, .form-check-label.ar {
+            font-size: calc(1.35rem * var(--exam-font-scale)) !important;
+        }
 
         /* ══════════════════════════════════════════
            FIX #8 — OVERLAY 1: Sebelum ujian dimulai
@@ -191,6 +247,10 @@
         .pilihan-ganda .form-check:has(input:checked){ border-color:var(--primary); background:var(--primary-light); box-shadow:inset 0 0 0 1px var(--primary); }
         .form-check-input{ width:17px; height:17px; margin-top:2px; flex-shrink:0; accent-color:var(--primary); cursor:pointer; }
         .form-check-label{ cursor:pointer; font-size:.88rem; color:#34495e; line-height:1.5; flex:1; }
+        .pasangan-baris{ display:flex; flex-direction:column; gap:.35rem; padding:.6rem .75rem; background:#fafbff; border:1.5px solid #e2e5ec; border-radius:var(--radius-sm); }
+        .pasangan-select{ min-height:44px; }
+        .pasangan-kiri{ font-size:.92rem; color:#2c3e50; line-height:1.6; }
+        .pasangan-kiri.ar{ font-size:calc(1.2rem * var(--exam-font-scale)); }
         .menjodohkan .form-select,.essay .form-control{ border-radius:var(--radius-sm); border:1.5px solid #e2e5ec; font-family:var(--font-body); font-size:.88rem; transition:all .2s; background:#fafbff; }
         .menjodohkan .form-select:focus,.essay .form-control:focus{ border-color:var(--primary); box-shadow:0 0 0 3px rgba(var(--primary-rgb),.12); outline:none; background:#fff; }
         .essay textarea{ resize:vertical; min-height:110px; }
@@ -229,28 +289,49 @@
         /* Floating nav toggle mobile */
         #navToggleFloat{ display:none; position:fixed; bottom:1.25rem; right:1.25rem; z-index:400; width:50px; height:50px; border-radius:50%; background:linear-gradient(135deg,var(--primary),#4c6ef5); color:#fff; border:none; box-shadow:0 4px 16px rgba(var(--primary-rgb),.4); font-size:1.2rem; cursor:pointer; align-items:center; justify-content:center; transition:all .22s; }
 
+        /* Touch targets ≥ 44px & Mobile Ergonomics (T2.3) */
+        .pilihan-ganda .form-check{
+            min-height: 46px;
+            padding: .75rem 1rem;
+            align-items: center;
+        }
+        .form-check-input{
+            width: 22px;
+            height: 22px;
+        }
+        .nav-btn{
+            min-height: 44px;
+            font-size: .82rem;
+        }
+        .btn-selesai{
+            min-height: 48px;
+        }
+
         /* Responsive */
         @media(max-width:768px){
-            .exam-topbar{ flex-wrap:wrap; padding:.55rem 1rem; min-height:56px; }
+            .exam-topbar{ flex-wrap:wrap; padding:.55rem .75rem; min-height:56px; }
+            .exam-topbar-right{ flex-wrap:wrap; width:100%; justify-content:space-between; gap:.4rem; }
             .exam-info-text .exam-sub{ display:none; }
-            #timer{ font-size:1.1rem; min-width:78px; padding:.22rem .7rem; }
-            .progress-strip{ top:56px; }
-            .exam-main{ padding-top:68px; }
-            .exam-layout{ grid-template-columns:1fr; padding:.9rem; padding-bottom:5rem; }
-            .nav-panel{ position:fixed; bottom:0;left:0;right:0; border-radius:14px 14px 0 0; box-shadow:0 -4px 24px rgba(0,0,0,.13); transform:translateY(100%); transition:transform .32s ease; z-index:400; max-height:55vh; overflow-y:auto; padding:1rem; top:auto !important; }
-            .nav-panel::before{ content:''; display:block; width:36px; height:4px; background:#dee2e6; border-radius:99px; margin:0 auto .8rem; }
+            #timer{ font-size:1.05rem; min-width:74px; padding:.22rem .5rem; }
+            .progress-strip{ top:var(--topbar-h, 56px); }
+            .exam-main{ padding-top:calc(var(--topbar-h, 56px) + 12px); }
+            .exam-layout{ grid-template-columns:1fr; padding:.75rem; padding-bottom:5.5rem; overflow-x:hidden; }
+            .nav-panel{ position:fixed; bottom:0;left:0;right:0; border-radius:16px 16px 0 0; box-shadow:0 -4px 24px rgba(0,0,0,.15); transform:translateY(100%); transition:transform .32s ease; z-index:400; max-height:60vh; overflow-y:auto; padding:1.25rem 1rem; top:auto !important; }
+            .nav-panel::before{ content:''; display:block; width:40px; height:5px; background:#ced4da; border-radius:99px; margin:0 auto 1rem; }
             .nav-panel.open{ transform:translateY(0); }
-            .nav-grid{ grid-template-columns:repeat(8,1fr); }
-            #navToggleFloat{ display:flex; }
+            .nav-grid{ grid-template-columns:repeat(5,1fr); gap:8px; }
+            #navToggleFloat{ display:flex; min-width:48px; min-height:48px; }
             #fs-indicator span{ display:none; }
         }
         @media(max-width:480px){
-            .soal-card{ padding:1.1rem; }
-            .nav-grid{ grid-template-columns:repeat(6,1fr); }
+            .exam-topbar{ padding:.45rem .6rem; }
+            .soal-card{ padding:1.1rem .9rem; }
+            .nav-grid{ grid-template-columns:repeat(5,1fr); gap:6px; }
         }
         @media(hover:none) and (pointer:coarse){
             .soal-card:hover{ box-shadow:var(--shadow-sm); border-color:transparent; }
             .btn-selesai:hover{ transform:none; }
+            .nav-btn{ min-height:44px; }
         }
         @media print{
             .exam-topbar,.progress-strip,#warningToast,#navToggleFloat,.nav-panel,#fs-overlay,#fs-lost-overlay{ display:none !important; }
@@ -316,6 +397,12 @@
         </div>
     </div>
     <div class="exam-topbar-right">
+        <!-- Kontrol Ukuran Teks (A- / A+) (T2.2) -->
+        <div class="font-size-ctrl" title="Atur ukuran teks">
+            <button type="button" class="btn-font-size" id="btn-font-dec" aria-label="Kecilkan teks">A−</button>
+            <span class="font-size-label" id="font-size-val">100%</span>
+            <button type="button" class="btn-font-size" id="btn-font-inc" aria-label="Besarkan teks">A+</button>
+        </div>
         <!-- Indikator sinkronisasi jawaban (T1.7) -->
         <div id="sync-indicator" class="sync-saved" title="Status penyimpanan jawaban">
             <i class="bi bi-cloud-check-fill" id="sync-icon"></i>

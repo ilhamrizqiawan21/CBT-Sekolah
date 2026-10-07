@@ -105,8 +105,7 @@
                     <table class="table table-bordered" id="tabelEssay">
                         <thead class="table-light">
                             <tr>
-                                <th style="width:5%">No</th><th style="width:60%">Teks Soal</th>
-                                <th style="width:25%">Kata Kunci (pisahkan koma)</th>
+                                <th style="width:5%">No</th><th style="width:85%">Teks Soal</th>
                                 <th style="width:5%">Poin</th><th style="width:5%">Aksi</th>
                             </tr>
                         </thead>
@@ -185,11 +184,11 @@
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td class="text-center">${pgRowCount}</td>
-            <td><textarea class="form-control teks_soal_pg" rows="2" placeholder="Teks soal..."></textarea></td>
-            <td><input type="text" class="form-control pilihan_a" placeholder="Pilihan A"></td>
-            <td><input type="text" class="form-control pilihan_b" placeholder="Pilihan B"></td>
-            <td><input type="text" class="form-control pilihan_c" placeholder="Pilihan C"></td>
-            <td><input type="text" class="form-control pilihan_d" placeholder="Pilihan D"></td>
+            <td><textarea class="form-control teks_soal_pg" rows="2" dir="auto" placeholder="Teks soal..."></textarea></td>
+            <td><input type="text" class="form-control pilihan_a" dir="auto" placeholder="Pilihan A"></td>
+            <td><input type="text" class="form-control pilihan_b" dir="auto" placeholder="Pilihan B"></td>
+            <td><input type="text" class="form-control pilihan_c" dir="auto" placeholder="Pilihan C"></td>
+            <td><input type="text" class="form-control pilihan_d" dir="auto" placeholder="Pilihan D"></td>
             <td><select class="form-select jawaban_pg"><option value="">--</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option></select></td>
             <td><input type="number" class="form-control poin_pg" value="1" style="width:70px"></td>
             <td class="text-center"><button class="btn btn-sm btn-danger hapusBaris"><i class="bi bi-trash"></i></button></td>
@@ -204,9 +203,9 @@
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td class="text-center">${menjodohkanRowCount}</td>
-            <td><textarea class="form-control teks_soal_menjodohkan" rows="2" placeholder="Teks soal..."></textarea></td>
-            <td><input type="text" class="form-control pasangan_kiri" placeholder="Contoh: Pancasila ke-1"></td>
-            <td><input type="text" class="form-control pasangan_kanan" placeholder="Contoh: Ketuhanan"></td>
+            <td><textarea class="form-control teks_soal_menjodohkan" rows="2" dir="auto" placeholder="Teks soal..."></textarea></td>
+            <td><input type="text" class="form-control pasangan_kiri" dir="auto" placeholder="Contoh: Pancasila ke-1"></td>
+            <td><input type="text" class="form-control pasangan_kanan" dir="auto" placeholder="Contoh: Ketuhanan"></td>
             <td><input type="number" class="form-control poin_menjodohkan" value="2" style="width:70px"></td>
             <td class="text-center"><button class="btn btn-sm btn-danger hapusBaris"><i class="bi bi-trash"></i></button></td>
         `;
@@ -220,9 +219,8 @@
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td class="text-center">${essayRowCount}</td>
-            <td><textarea class="form-control teks_soal_essay" rows="2" placeholder="Teks soal..."></textarea></td>
-            <td><input type="text" class="form-control kata_kunci" placeholder="kata1, kata2, kata3"></td>
-            <td><input type="number" class="form-control poin_essay" value="3" style="width:70px"></td>
+            <td><textarea class="form-control teks_soal_essay" rows="2" dir="auto" placeholder="Teks soal..."></textarea></td>
+            <td><input type="number" class="form-control poin_essay" value="4" style="width:70px"></td>
             <td class="text-center"><button class="btn btn-sm btn-danger hapusBaris"><i class="bi bi-trash"></i></button></td>
         `;
         document.getElementById('tbodyEssay').appendChild(tr);
@@ -251,7 +249,7 @@
                 pilihan_c: tr.querySelector('.pilihan_c')?.value || '',
                 pilihan_d: tr.querySelector('.pilihan_d')?.value || '',
                 jawaban_benar: tr.querySelector('.jawaban_pg')?.value || '',
-                poin: parseInt(tr.querySelector('.poin_pg')?.value) || 1
+                poin: parseInt(tr.querySelector('.poin_pg')?.value) || 2
             });
         });
 
@@ -274,12 +272,10 @@
         // Kumpulkan soal Essay
         document.querySelectorAll('#tbodyEssay tr').forEach(tr => {
             const teks = tr.querySelector('.teks_soal_essay')?.value;
-            const kataKunci = tr.querySelector('.kata_kunci')?.value;
             if (!teks) return;
             soalEssay.push({
                 teks_soal: teks,
-                kata_kunci: kataKunci.split(',').map(k => k.trim()),
-                poin: parseInt(tr.querySelector('.poin_essay')?.value) || 3
+                poin: parseInt(tr.querySelector('.poin_essay')?.value) || 4
             });
         });
 
@@ -305,4 +301,5 @@
     });
 </script>
 
+<script src="/js/pratinjau.js"></script>
 <%- include('../partials/footer') %>

@@ -226,7 +226,7 @@ router.post('/soal/batch-tambah', async (req, res) => {
             totalInserted++;
         }
         for (const soal of soal_essay) {
-            await pool.query(`INSERT INTO soal (ujian_id, tipe_soal, teks_soal, poin, jawaban_benar, opsi_tambahan) VALUES (?, 'essay', ?, ?, ?, ?)`, [ujian_id, soal.teks_soal, soal.poin, JSON.stringify(soal.kata_kunci), JSON.stringify({ kata_kunci: soal.kata_kunci })]);
+            await pool.query(`INSERT INTO soal (ujian_id, tipe_soal, teks_soal, poin, jawaban_benar, opsi_tambahan) VALUES (?, 'essay', ?, ?, ?, ?)`, [ujian_id, soal.teks_soal, soal.poin, '[]', '{}']);
             totalInserted++;
         }
         res.json({ success: true, total: totalInserted });
@@ -578,7 +578,7 @@ router.get('/hasil/export', async (req, res) => {
     const { ujian } = req.query;
     let filter = '', params = [];
     if (ujian) { filter = 'WHERE n.ujian_id = ?'; params.push(ujian); }
-    const [hasil] = await pool.query(`SELECT s.nis, s.nama as siswa_nama, u.nama_ujian, n.nilai, n.benar, n.salah, n.kosong, n.selesai_pada FROM nilai_ujian n JOIN siswa s ON n.siswa_id = s.id JOIN ujian u ON n.ujian_id = u.id ${filter} ORDER BY n.selesai_pada DESC`, params);
+    const [hasil] = await pool.query(`SELECT s.nis, s.nama as siswa_nama, s.kelas, u.nama_ujian, n.poin_otomatis, n.poin_essay, n.nilai, n.status_koreksi, n.benar, n.salah, n.kosong, n.selesai_pada FROM nilai_ujian n JOIN siswa s ON n.siswa_id = s.id JOIN ujian u ON n.ujian_id = u.id ${filter} ORDER BY n.selesai_pada DESC`, params);
     require('../utils/excelExport')(hasil, res, 'hasil_ujian.xlsx');
 });
 
@@ -586,10 +586,23 @@ router.get('/hasil/cetak/:ujianId', async (req, res) => {
     try {
         const [ujian] = await pool.query('SELECT * FROM ujian WHERE id = ?', [req.params.ujianId]);
         if (ujian.length === 0) return res.status(404).send('Ujian tidak ditemukan');
-        const [results] = await pool.query(`SELECT s.nis, s.nama as siswa_nama, s.kelas, u.nama_ujian, so.id as soal_id, so.teks_soal, so.tipe_soal, so.jawaban_benar, js.jawaban_dipilih, js.is_benar, n.nilai, n.benar, n.salah, n.kosong, n.selesai_pada FROM nilai_ujian n JOIN siswa s ON n.siswa_id = s.id JOIN ujian u ON n.ujian_id = u.id LEFT JOIN jawaban_siswa js ON js.siswa_id = s.id AND js.ujian_id = u.id LEFT JOIN soal so ON so.id = js.soal_id WHERE n.ujian_id = ? ORDER BY s.nama, so.id`, [req.params.ujianId]);
+        const [results] = await pool.query(`SELECT s.nis, s.nama as siswa_nama, s.kelas, u.nama_ujian, so.id as soal_id, so.teks_soal, so.tipe_soal, so.jawaban_benar, js.jawaban_dipilih, js.is_benar, n.poin_otomatis, n.poin_essay, n.status_koreksi, n.nilai, n.benar, n.salah, n.kosong, n.selesai_pada FROM nilai_ujian n JOIN siswa s ON n.siswa_id = s.id JOIN ujian u ON n.ujian_id = u.id LEFT JOIN jawaban_siswa js ON js.siswa_id = s.id AND js.ujian_id = u.id LEFT JOIN soal so ON so.id = js.soal_id WHERE n.ujian_id = ? ORDER BY s.nama, so.id`, [req.params.ujianId]);
         const siswaMap = new Map();
         results.forEach(row => {
-            if (!siswaMap.has(row.siswa_nama)) siswaMap.set(row.siswa_nama, { nis: row.nis, nama: row.siswa_nama, kelas: row.kelas, nilai: row.nilai, benar: row.benar, salah: row.salah, kosong: row.kosong, selesai: row.selesai_pada, jawaban: [] });
+            if (!siswaMap.has(row.siswa_nama)) siswaMap.set(row.siswa_nama, {
+                nis: row.nis,
+                nama: row.siswa_nama,
+                kelas: row.kelas,
+                poin_otomatis: row.poin_otomatis,
+                poin_essay: row.poin_essay,
+                status_koreksi: row.status_koreksi,
+                nilai: row.nilai,
+                benar: row.benar,
+                salah: row.salah,
+                kosong: row.kosong,
+                selesai: row.selesai_pada,
+                jawaban: []
+            });
             if (row.soal_id) siswaMap.get(row.siswa_nama).jawaban.push({ soal_id: row.soal_id, teks_soal: row.teks_soal, tipe: row.tipe_soal, jawaban_benar: row.jawaban_benar, jawaban_siswa: row.jawaban_dipilih, is_benar: row.is_benar });
         });
         res.render('admin/cetak_hasil', { ujian: ujian[0], siswaList: Array.from(siswaMap.values()) });

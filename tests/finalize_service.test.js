@@ -209,6 +209,7 @@ describe('Job Penutupan Otomatis & Finalisasi Sesi (T1.8)', () => {
             [seeded.siswa1Id, seeded.ujianId, seeded.soalId]
         );
 
+        process.env.TAMPILKAN_NILAI_SISWA = 'true';
         const res = await makeRequest('/api/selesai-ujian', 'POST', {}, sessionCookie);
         assert.strictEqual(res.statusCode, 200);
         const json = JSON.parse(res.body);

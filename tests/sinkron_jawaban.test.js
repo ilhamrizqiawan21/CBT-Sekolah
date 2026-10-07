@@ -132,10 +132,12 @@ describe('Sinkron Jawaban Batch IDEMPOTEN (POST /api/sinkron-jawaban) (T1.6)', (
     }
 
     test('1. Idempoten: kirim batch yang sama dua kali menghasilkan respons dan data DB yang identik', async () => {
+        const t1 = new Date(Date.now() - 20000).toISOString();
+        const t2 = new Date(Date.now() - 15000).toISOString();
         const batch = {
             jawaban: [
-                { soal_id: seeded.soalId, jawaban: 'B', client_ts: '2026-10-07T10:00:00.000Z' },
-                { soal_id: seeded.soal2Id, jawaban: 'B', client_ts: '2026-10-07T10:00:05.000Z' }
+                { soal_id: seeded.soalId, jawaban: 'B', client_ts: t1 },
+                { soal_id: seeded.soal2Id, jawaban: 'B', client_ts: t2 }
             ]
         };
 
@@ -175,10 +177,11 @@ describe('Sinkron Jawaban Batch IDEMPOTEN (POST /api/sinkron-jawaban) (T1.6)', (
     });
 
     test('2. client_ts lebih lama tidak menimpa yang baru', async () => {
-        // Simpan jawaban baru terlebih dahulu: jawaban 'B' pada jam 10:10
+        // Simpan jawaban baru terlebih dahulu: jawaban 'B' pada waktu t_baru
+        const tBaru = new Date(Date.now() - 5000).toISOString();
         const batchBaru = {
             jawaban: [
-                { soal_id: seeded.soalId, jawaban: 'B', client_ts: '2026-10-07T10:10:00.000Z' }
+                { soal_id: seeded.soalId, jawaban: 'B', client_ts: tBaru }
             ]
         };
         const resBaru = await makeRequest('/api/sinkron-jawaban', 'POST', batchBaru, sessionCookie);
@@ -191,10 +194,11 @@ describe('Sinkron Jawaban Batch IDEMPOTEN (POST /api/sinkron-jawaban) (T1.6)', (
         );
         assert.strictEqual(rowSetelahBaru[0].jawaban_dipilih, 'B');
 
-        // Sekarang kirim jawaban dengan timestamp lebih usang: jawaban 'A' pada jam 10:05
+        // Sekarang kirim jawaban dengan timestamp lebih usang: jawaban 'A' pada waktu t_lama (10 detik sebelum t_baru)
+        const tLama = new Date(Date.now() - 15000).toISOString();
         const batchLama = {
             jawaban: [
-                { soal_id: seeded.soalId, jawaban: 'A', client_ts: '2026-10-07T10:05:00.000Z' }
+                { soal_id: seeded.soalId, jawaban: 'A', client_ts: tLama }
             ]
         };
         const resLama = await makeRequest('/api/sinkron-jawaban', 'POST', batchLama, sessionCookie);

@@ -20,3 +20,6 @@ __pycache__/
 build/
 dist/
 release/
+
+# Output uji UI (screenshot)
+tests/ui/out/

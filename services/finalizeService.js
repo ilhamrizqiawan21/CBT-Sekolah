@@ -2,79 +2,103 @@ const defaultPool = require('../models/db');
 const { DEFAULT_GRACE_DETIK } = require('./sesiService');
 
 /**
- * Memfinalisasi satu sesi ujian siswa (DESIGN §3.4, §3.5, T1.8):
- * - Menghitung nilai dari jawaban_siswa vs soal
- * - Menyimpan ke tabel nilai_ujian (idempoten)
- * - Mengubah status sesi_ujian menjadi 'selesai' dan mengisi 'selesai_pada'
+ * Menghitung ulang nilai dari jawaban_siswa + nilai_essay dan menyimpannya ke
+ * nilai_ujian (idempoten). TIDAK mengubah status sesi_ujian — aman dipanggil
+ * untuk sesi yang masih berjalan (mis. setelah guru menyimpan nilai essay).
  */
-async function finalizeSesi(siswaId, ujianId, db = defaultPool) {
-    // 1. Ambil data sesi
-    const [sesiRows] = await db.query(
-        'SELECT * FROM sesi_ujian WHERE siswa_id = ? AND ujian_id = ?',
-        [siswaId, ujianId]
-    );
-
-    // 2. Ambil soal ujian
+async function hitungUlangNilai(siswaId, ujianId, db = defaultPool) {
+    // 2. Ambil soal ujian lengkap
     const [soalRows] = await db.query(
-        'SELECT id, poin, tipe_soal FROM soal WHERE ujian_id = ?',
+        'SELECT id, tipe_soal, poin, jawaban_benar FROM soal WHERE ujian_id = ?',
         [ujianId]
     );
-    const totalSoal = soalRows.length;
-    const totalPoin = soalRows.reduce((sum, s) => sum + (s.poin || 1), 0);
 
     // 3. Ambil jawaban siswa
     const [jawabanRows] = await db.query(
-        'SELECT soal_id, is_benar FROM jawaban_siswa WHERE siswa_id = ? AND ujian_id = ?',
+        'SELECT soal_id, jawaban_dipilih FROM jawaban_siswa WHERE siswa_id = ? AND ujian_id = ?',
         [siswaId, ujianId]
     );
-
-    let benar = 0;
-    let salah = 0;
-
+    const jawabanMap = {};
     for (const j of jawabanRows) {
-        if (j.is_benar === 1) {
-            benar++;
-        } else if (j.is_benar === 0) {
-            salah++;
-        }
+        jawabanMap[j.soal_id] = j.jawaban_dipilih;
     }
 
-    const kosong = Math.max(0, totalSoal - (benar + salah));
-    const nilai = totalSoal > 0 ? Math.round((benar / totalSoal) * 100) : 0;
-
-    // 4. Simpan nilai_ujian (idempoten via ON DUPLICATE KEY UPDATE)
-    await db.query(
-        `INSERT INTO nilai_ujian (siswa_id, ujian_id, nilai, benar, salah, kosong, selesai_pada)
-         VALUES (?, ?, ?, ?, ?, ?, NOW())
-         ON DUPLICATE KEY UPDATE
-           nilai        = VALUES(nilai),
-           benar        = VALUES(benar),
-           salah        = VALUES(salah),
-           kosong       = VALUES(kosong),
-           selesai_pada = COALESCE(selesai_pada, NOW())`,
-        [siswaId, ujianId, nilai, benar, salah, kosong]
+    // 4. Ambil skor essay (jika sudah dinilai guru)
+    const [essayRows] = await db.query(
+        'SELECT soal_id, skor FROM nilai_essay WHERE siswa_id = ? AND ujian_id = ?',
+        [siswaId, ujianId]
     );
-
-    // 5. Perbarui sesi_ujian menjadi 'selesai'
-    if (sesiRows.length > 0) {
-        await db.query(
-            `UPDATE sesi_ujian
-             SET status = 'selesai',
-                 selesai_pada = COALESCE(selesai_pada, NOW())
-             WHERE siswa_id = ? AND ujian_id = ?`,
-            [siswaId, ujianId]
-        );
+    const skorEssay = {};
+    for (const e of essayRows) {
+        skorEssay[e.soal_id] = e.skor;
     }
+
+    // 5. Hitung menggunakan penilaianService (DESIGN §3.5, T3.2, T3.4)
+    const penilaianService = require('./penilaianService');
+    const hasil = penilaianService.hitung({
+        soalList: soalRows,
+        jawabanMap,
+        skorEssay
+    });
+
+    // 6. Simpan nilai_ujian (idempoten via ON DUPLICATE KEY UPDATE)
+    await db.query(
+        `INSERT INTO nilai_ujian (siswa_id, ujian_id, poin_otomatis, poin_essay, poin_maks, nilai, benar, salah, kosong, status_koreksi, selesai_pada)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+         ON DUPLICATE KEY UPDATE
+           poin_otomatis  = VALUES(poin_otomatis),
+           poin_essay     = VALUES(poin_essay),
+           poin_maks      = VALUES(poin_maks),
+           nilai          = VALUES(nilai),
+           benar          = VALUES(benar),
+           salah          = VALUES(salah),
+           kosong         = VALUES(kosong),
+           status_koreksi = VALUES(status_koreksi),
+           selesai_pada   = COALESCE(selesai_pada, NOW())`,
+        [
+            siswaId,
+            ujianId,
+            hasil.poin_otomatis,
+            hasil.poin_essay,
+            hasil.poin_maks,
+            hasil.nilai,
+            hasil.benar,
+            hasil.salah,
+            hasil.kosong,
+            hasil.status_koreksi
+        ]
+    );
 
     return {
         siswaId,
         ujianId,
-        nilai,
-        benar,
-        salah,
-        kosong,
-        totalSoal
+        poin_otomatis: hasil.poin_otomatis,
+        poin_essay: hasil.poin_essay,
+        poin_maks: hasil.poin_maks,
+        nilai: hasil.nilai,
+        benar: hasil.benar,
+        salah: hasil.salah,
+        kosong: hasil.kosong,
+        status_koreksi: hasil.status_koreksi,
+        totalSoal: soalRows.length
     };
+}
+
+/**
+ * Memfinalisasi satu sesi ujian siswa (DESIGN §3.4, §3.5, T1.8):
+ * - Menghitung nilai (hitungUlangNilai) dan menyimpannya ke nilai_ujian
+ * - Mengubah status sesi_ujian menjadi 'selesai' dan mengisi 'selesai_pada'
+ */
+async function finalizeSesi(siswaId, ujianId, db = defaultPool) {
+    const hasil = await hitungUlangNilai(siswaId, ujianId, db);
+    await db.query(
+        `UPDATE sesi_ujian
+         SET status = 'selesai',
+             selesai_pada = COALESCE(selesai_pada, NOW())
+         WHERE siswa_id = ? AND ujian_id = ?`,
+        [siswaId, ujianId]
+    );
+    return hasil;
 }
 
 /**
@@ -125,6 +149,7 @@ function startAutoFinalizeJob(db = defaultPool, intervalMs = 30000) {
 }
 
 module.exports = {
+    hitungUlangNilai,
     finalizeSesi,
     tutupSesiKadaluarsa,
     startAutoFinalizeJob

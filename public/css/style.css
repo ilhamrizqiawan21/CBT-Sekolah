@@ -1,10 +1,27 @@
 /* ============================================================
    CBT SISTEM — Enhanced & Fully Responsive Stylesheet
    Struktur: #wrapper > nav.sidebar#sidebar + #content-wrapper
-   Fonts   : Sora (heading) + DM Sans (body)
+   Fonts   : Sora (heading) + DM Sans (body) + Amiri (Arabic local)
    ============================================================ */
 
 @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap');
+
+/* Font Arab Lokal (Amiri - OFL License, D-014, T2.1) */
+@font-face {
+    font-family: 'Amiri';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('/fonts/amiri-v30-arabic-regular.woff2') format('woff2');
+}
+
+@font-face {
+    font-family: 'Amiri';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('/fonts/amiri-v30-arabic-700.woff2') format('woff2');
+}
 
 /* ============================================================
    1. DESIGN TOKENS
@@ -13,6 +30,7 @@
     --primary:        #3b5bdb;
     --primary-light:  #eef2ff;
     --primary-rgb:    59,91,219;
+    --font-arabic:    'Amiri', serif;
     --success:        #0ca678;
     --success-light:  #e6f8f3;
     --success-rgb:    12,166,120;
@@ -824,4 +842,49 @@ footer,.sticky-footer {
     .sidebar .nav-link:hover { transform:none; }
     .btn:active         { opacity:.82; }
     .answer-option:active { background:var(--primary-light); border-color:var(--primary); }
+}
+
+/* ============================================================
+   T2.1 & T2.2: Teks Arab, RTL, dan Kontrol Ukuran
+   ============================================================ */
+/* Arah teks ditentukan atribut dir="auto" (huruf kuat pertama), bukan dipaksa CSS,
+   agar kalimat Indonesia dengan kutipan Arab tetap LTR. */
+.ar {
+    font-family: 'Amiri', 'DM Sans', sans-serif;
+    line-height: 2.2 !important;
+}
+
+/* Pratinjau soal (form admin/guru) */
+#pratinjau-soal {
+    position: fixed; right: 12px; bottom: 12px; z-index: 1050;
+    width: min(380px, calc(100vw - 24px)); max-height: 40vh; overflow-y: auto;
+    background: #fff; border: 1px solid #dee2e6; border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,.15); padding: .6rem .85rem;
+}
+#pratinjau-soal .pj-head { font-size: .72rem; font-weight: 600; color: #868e96; margin-bottom: .25rem; }
+#pratinjau-soal .pj-body { white-space: pre-wrap; word-break: break-word; font-size: 1rem; }
+
+.ar {
+    font-size: 1.35em;
+    letter-spacing: 0;
+}
+
+/* Harakat dan rendering ligatur Arab yang optimal */
+.ar, [dir="rtl"], [dir="auto"] {
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "liga" 1, "calt" 1;
+}
+
+/* Pastikan form input/textarea admin dan guru mendukung auto direction */
+input[dir="auto"],
+textarea[dir="auto"] {
+    text-align: start;
+    unicode-bidi: plaintext;
+}
+
+input[dir="auto"].ar,
+textarea[dir="auto"].ar {
+    font-family: 'Amiri', 'DM Sans', sans-serif;
+    font-size: 1.25rem;
+    line-height: 2;
 }

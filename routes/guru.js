@@ -222,11 +222,10 @@ router.post('/soal/batch-tambah', async (req, res) => {
         
         for (const soal of soal_essay) {
             if (!soal.teks_soal) continue;
-            const opsiJSON = JSON.stringify({ kata_kunci: soal.kata_kunci || [] });
             await pool.query(
                 `INSERT INTO soal (ujian_id, tipe_soal, teks_soal, poin, jawaban_benar, opsi_tambahan) 
                  VALUES (?, 'essay', ?, ?, ?, ?)`,
-                [ujian_id, soal.teks_soal, soal.poin || 3, JSON.stringify(soal.kata_kunci || []), opsiJSON]
+                [ujian_id, soal.teks_soal, soal.poin || 4, '[]', '{}']
             );
             totalInserted++;
         }
@@ -415,7 +414,8 @@ router.get('/hasil-siswa/export', async (req, res) => {
 
     let query = `
         SELECT s.nis, s.nama as siswa_nama, s.kelas, u.nama_ujian, 
-               mp.nama_mapel, n.nilai, n.benar, n.salah, n.kosong, n.selesai_pada 
+               mp.nama_mapel, n.poin_otomatis, n.poin_essay, n.nilai, n.status_koreksi, 
+               n.benar, n.salah, n.kosong, n.selesai_pada 
         FROM nilai_ujian n 
         JOIN siswa s ON n.siswa_id = s.id 
         JOIN ujian u ON n.ujian_id = u.id 
@@ -448,7 +448,10 @@ router.get('/hasil-siswa/export', async (req, res) => {
         { header: 'Kelas', key: 'kelas', width: 15 },
         { header: 'Ujian', key: 'nama_ujian', width: 30 },
         { header: 'Mata Pelajaran', key: 'nama_mapel', width: 20 },
-        { header: 'Nilai', key: 'nilai', width: 10 },
+        { header: 'Poin PG+Menjodohkan', key: 'poin_otomatis', width: 22 },
+        { header: 'Poin Essay', key: 'poin_essay', width: 15 },
+        { header: 'Nilai Akhir', key: 'nilai', width: 12 },
+        { header: 'Status Koreksi', key: 'status_koreksi', width: 18 },
         { header: 'Benar', key: 'benar', width: 10 },
         { header: 'Salah', key: 'salah', width: 10 },
         { header: 'Kosong', key: 'kosong', width: 10 },
@@ -462,11 +465,14 @@ router.get('/hasil-siswa/export', async (req, res) => {
             kelas: row.kelas,
             nama_ujian: row.nama_ujian,
             nama_mapel: row.nama_mapel,
-            nilai: row.nilai,
+            poin_otomatis: row.poin_otomatis ?? 0,
+            poin_essay: row.poin_essay ?? 0,
+            nilai: row.nilai ?? 0,
+            status_koreksi: row.status_koreksi === 'menunggu_essay' ? 'Menunggu Essay' : (row.status_koreksi === 'selesai' ? 'Selesai' : (row.status_koreksi || '-')),
             benar: row.benar,
             salah: row.salah,
             kosong: row.kosong,
-            selesai_pada: new Date(row.selesai_pada).toLocaleString()
+            selesai_pada: row.selesai_pada ? new Date(row.selesai_pada).toLocaleString() : '-'
         });
     });
 
@@ -648,6 +654,492 @@ router.get('/log-kecurangan/export', async (req, res) => {
     res.setHeader('Content-Disposition', 'attachment; filename=log_kecurangan_guru.xlsx');
     await workbook.xlsx.write(res);
     res.end();
+});
+
+// ==================== PENILAIAN ESSAY (T3.5, DESIGN §3.5) ====================
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const ExcelJS = require('exceljs');
+const { hitungUlangNilai } = require('../services/finalizeService');
+
+const uploadEssay = multer({
+    dest: 'uploads/',
+    limits: { fileSize: 2 * 1024 * 1024 }, // 2 MB
+    fileFilter: (req, file, cb) => {
+        const ext = path.extname(file.originalname).toLowerCase();
+        if (ext !== '.xlsx') {
+            return cb(new Error('Hanya file Excel (.xlsx) yang diperbolehkan'));
+        }
+        cb(null, true);
+    }
+});
+
+// Helper validasi guru pengampu
+async function checkGuruPengampuUjian(ujianId, guruId) {
+    const [rows] = await pool.query(`
+        SELECT u.id, u.nama_ujian, pg.guru_id, mp.nama_mapel, k.nama_kelas
+        FROM ujian u
+        JOIN pengajaran pg ON u.pengajaran_id = pg.id
+        JOIN mata_pelajaran mp ON pg.mapel_id = mp.id
+        JOIN kelas k ON pg.kelas_id = k.id
+        WHERE u.id = ?
+    `, [ujianId]);
+    if (rows.length === 0) return { exists: false };
+    if (rows[0].guru_id !== guruId) return { exists: true, authorized: false, ujian: rows[0] };
+    return { exists: true, authorized: true, ujian: rows[0] };
+}
+
+// Hanya sesi yang sudah selesai yang boleh dinilai essay-nya: menyimpan nilai
+// tidak boleh menghentikan ujian siswa yang masih berjalan.
+async function ambilPesertaSelesai(ujianId) {
+    const [rows] = await pool.query(
+        "SELECT siswa_id FROM sesi_ujian WHERE ujian_id = ? AND status = 'selesai'",
+        [ujianId]
+    );
+    return new Set(rows.map(r => r.siswa_id));
+}
+
+// 1. Daftar Ujian dengan Soal Essay
+router.get('/essay', async (req, res) => {
+    const guruId = req.session.guruId;
+
+    try {
+        const [ujianList] = await pool.query(`
+            SELECT u.id, u.nama_ujian, mp.nama_mapel, k.nama_kelas, u.tanggal_mulai, u.tanggal_selesai,
+                   COUNT(DISTINCT s.id) as jumlah_essay,
+                   COUNT(DISTINCT nu.siswa_id) as total_peserta,
+                   SUM(CASE WHEN nu.status_koreksi = 'selesai' THEN 1 ELSE 0 END) as peserta_selesai,
+                   SUM(CASE WHEN nu.status_koreksi = 'menunggu_essay' THEN 1 ELSE 0 END) as peserta_menunggu
+            FROM ujian u
+            JOIN pengajaran pg ON u.pengajaran_id = pg.id
+            JOIN mata_pelajaran mp ON pg.mapel_id = mp.id
+            JOIN kelas k ON pg.kelas_id = k.id
+            JOIN soal s ON s.ujian_id = u.id AND s.tipe_soal = 'essay'
+            LEFT JOIN nilai_ujian nu ON nu.ujian_id = u.id
+            WHERE pg.guru_id = ?
+            GROUP BY u.id, u.nama_ujian, mp.nama_mapel, k.nama_kelas, u.tanggal_mulai, u.tanggal_selesai
+            ORDER BY u.tanggal_mulai DESC
+        `, [guruId]);
+
+        res.render('guru/essay_daftar', {
+            ujianList,
+            msg: req.query.msg,
+            error: req.query.error
+        });
+    } catch (err) {
+        console.error('Error GET /guru/essay:', err);
+        res.status(500).send('Terjadi kesalahan saat memuat daftar penilaian essay');
+    }
+});
+
+// 2. Form Matriks Penilaian Essay Siswa
+router.get('/essay/:ujianId', async (req, res) => {
+    const guruId = req.session.guruId;
+    const ujianId = parseInt(req.params.ujianId);
+
+    try {
+        const authCheck = await checkGuruPengampuUjian(ujianId, guruId);
+        if (!authCheck.exists) {
+            return res.status(404).send('Ujian tidak ditemukan');
+        }
+        if (!authCheck.authorized) {
+            return res.status(403).send('Akses ditolak: Anda bukan guru pengampu ujian ini');
+        }
+
+        const ujian = authCheck.ujian;
+
+        // Ambil soal essay
+        const [soalList] = await pool.query(`
+            SELECT id, teks_soal, poin
+            FROM soal
+            WHERE ujian_id = ? AND tipe_soal = 'essay'
+            ORDER BY id ASC
+        `, [ujianId]);
+
+        if (soalList.length === 0) {
+            return res.redirect('/guru/essay?error=' + encodeURIComponent('Ujian ini tidak memiliki soal essay'));
+        }
+
+        // Ambil daftar siswa yang mengikuti ujian
+        const [siswaList] = await pool.query(`
+            SELECT s.id as siswa_id, s.nis, s.nama, s.kelas,
+                   nu.poin_otomatis, nu.poin_essay, nu.poin_maks, nu.nilai,
+                   COALESCE(nu.status_koreksi, 'menunggu_essay') as status_koreksi
+            FROM siswa s
+            JOIN sesi_ujian su ON su.siswa_id = s.id AND su.ujian_id = ? AND su.status = 'selesai'
+            LEFT JOIN nilai_ujian nu ON nu.siswa_id = s.id AND nu.ujian_id = su.ujian_id
+            ORDER BY s.nama ASC
+        `, [ujianId]);
+
+        // Ambil skor essay yang sudah ada
+        const [essayRows] = await pool.query(`
+            SELECT siswa_id, soal_id, skor
+            FROM nilai_essay
+            WHERE ujian_id = ?
+        `, [ujianId]);
+
+        const skorMap = {};
+        for (const row of essayRows) {
+            if (!skorMap[row.siswa_id]) skorMap[row.siswa_id] = {};
+            skorMap[row.siswa_id][row.soal_id] = row.skor;
+        }
+
+        res.render('guru/essay_penilaian', {
+            ujian,
+            soalList,
+            siswaList,
+            skorMap,
+            msg: req.query.msg,
+            error: req.query.error
+        });
+    } catch (err) {
+        console.error('Error GET /guru/essay/:ujianId:', err);
+        res.status(500).send('Terjadi kesalahan saat memuat form penilaian essay');
+    }
+});
+
+// 3. Simpan Nilai Essay & Hitung Ulang Nilai Akhir
+router.post('/essay/:ujianId', async (req, res) => {
+    const guruId = req.session.guruId;
+    const ujianId = parseInt(req.params.ujianId);
+
+    try {
+        const authCheck = await checkGuruPengampuUjian(ujianId, guruId);
+        if (!authCheck.exists) {
+            return res.status(404).send('Ujian tidak ditemukan');
+        }
+        if (!authCheck.authorized) {
+            return res.status(403).send('Akses ditolak: Anda bukan guru pengampu ujian ini');
+        }
+
+        // Ambil soal essay dan validasi poin maksimal
+        const [soalList] = await pool.query(`
+            SELECT id, poin
+            FROM soal
+            WHERE ujian_id = ? AND tipe_soal = 'essay'
+        `, [ujianId]);
+
+        const maxPoinMap = new Map();
+        soalList.forEach(s => maxPoinMap.set(s.id, s.poin));
+
+        const skorInput = req.body.skor || {};
+        const parsedSkor = {}; // { [siswaId]: { [soalId]: val } }
+
+        if (typeof skorInput === 'object' && skorInput !== null) {
+            for (const sKey of Object.keys(skorInput)) {
+                const sId = parseInt(String(sKey).replace(/\D/g, ''));
+                if (isNaN(sId)) continue;
+                const studentScores = skorInput[sKey] || {};
+                parsedSkor[sId] = parsedSkor[sId] || {};
+
+                for (const qKey of Object.keys(studentScores)) {
+                    const qId = parseInt(String(qKey).replace(/\D/g, ''));
+                    if (isNaN(qId)) continue;
+                    parsedSkor[sId][qId] = studentScores[qKey];
+                }
+            }
+        }
+
+        const siswaIds = Object.keys(parsedSkor);
+
+        // Hanya peserta yang sesinya sudah selesai yang boleh dinilai
+        const pesertaSelesai = await ambilPesertaSelesai(ujianId);
+        for (const sIdStr of siswaIds) {
+            if (!pesertaSelesai.has(parseInt(sIdStr))) {
+                return res.status(400).send(`Siswa ID ${sIdStr} bukan peserta ujian ini atau ujiannya belum selesai`);
+            }
+        }
+
+        // Validasi seluruh input skor sebelum menyimpan
+        for (const sIdStr of siswaIds) {
+            const studentScores = parsedSkor[sIdStr] || {};
+            for (const soalIdStr of Object.keys(studentScores)) {
+                const soalId = parseInt(soalIdStr);
+                const rawVal = studentScores[soalIdStr];
+                if (rawVal === '' || rawVal === null || rawVal === undefined) continue;
+
+                const val = Number(rawVal);
+                const maxPoin = maxPoinMap.get(soalId);
+                if (maxPoin === undefined) {
+                    return res.status(400).send(`Soal ID ${soalId} bukan bagian dari ujian ini`);
+                }
+                if (isNaN(val) || !Number.isInteger(val) || val < 0 || val > maxPoin) {
+                    return res.status(400).send(`Skor tidak valid untuk soal #${soalId}: Skor (${rawVal}) harus berupa bilangan bulat antara 0 dan ${maxPoin}`);
+                }
+            }
+        }
+
+        // Simpan nilai essay dan hitung ulang
+        for (const sIdStr of siswaIds) {
+            const siswaId = parseInt(sIdStr);
+            const studentScores = parsedSkor[sIdStr] || {};
+
+            for (const soalIdStr of Object.keys(studentScores)) {
+                const soalId = parseInt(soalIdStr);
+                const rawVal = studentScores[soalIdStr];
+                if (rawVal === '' || rawVal === null || rawVal === undefined) continue;
+
+                const val = parseInt(rawVal);
+                await pool.query(`
+                    INSERT INTO nilai_essay (siswa_id, ujian_id, soal_id, skor, dinilai_oleh, dinilai_pada)
+                    VALUES (?, ?, ?, ?, ?, NOW())
+                    ON DUPLICATE KEY UPDATE
+                      skor = VALUES(skor),
+                      dinilai_oleh = VALUES(dinilai_oleh),
+                      dinilai_pada = NOW()
+                `, [siswaId, ujianId, soalId, val, guruId]);
+            }
+
+            // Hitung ulang nilai akhir siswa
+            await hitungUlangNilai(siswaId, ujianId, pool);
+        }
+
+        res.redirect(`/guru/essay/${ujianId}?msg=` + encodeURIComponent('Nilai essay berhasil disimpan dan nilai akhir telah dihitung ulang'));
+    } catch (err) {
+        console.error('Error POST /guru/essay/:ujianId:', err);
+        res.status(500).send('Terjadi kesalahan saat menyimpan nilai essay: ' + err.message);
+    }
+});
+
+// 4. Ekspor Template Nilai Essay ke Excel
+router.get('/essay/:ujianId/export', async (req, res) => {
+    const guruId = req.session.guruId;
+    const ujianId = parseInt(req.params.ujianId);
+
+    try {
+        const authCheck = await checkGuruPengampuUjian(ujianId, guruId);
+        if (!authCheck.exists) {
+            return res.status(404).send('Ujian tidak ditemukan');
+        }
+        if (!authCheck.authorized) {
+            return res.status(403).send('Akses ditolak: Anda bukan guru pengampu ujian ini');
+        }
+
+        const ujian = authCheck.ujian;
+
+        const [soalList] = await pool.query(`
+            SELECT id, teks_soal, poin
+            FROM soal
+            WHERE ujian_id = ? AND tipe_soal = 'essay'
+            ORDER BY id ASC
+        `, [ujianId]);
+
+        const [siswaList] = await pool.query(`
+            SELECT s.id as siswa_id, s.nis, s.nama, s.kelas
+            FROM siswa s
+            JOIN sesi_ujian su ON su.siswa_id = s.id AND su.ujian_id = ? AND su.status = 'selesai'
+            ORDER BY s.nama ASC
+        `, [ujianId]);
+
+        const [essayRows] = await pool.query(`
+            SELECT siswa_id, soal_id, skor
+            FROM nilai_essay
+            WHERE ujian_id = ?
+        `, [ujianId]);
+
+        const skorMap = {};
+        for (const row of essayRows) {
+            if (!skorMap[row.siswa_id]) skorMap[row.siswa_id] = {};
+            skorMap[row.siswa_id][row.soal_id] = row.skor;
+        }
+
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Nilai Essay');
+
+        const columns = [
+            { header: 'ID Siswa', key: 'siswa_id', width: 12 },
+            { header: 'NIS', key: 'nis', width: 15 },
+            { header: 'Nama Siswa', key: 'nama', width: 30 },
+            { header: 'Kelas', key: 'kelas', width: 15 }
+        ];
+
+        soalList.forEach((s, idx) => {
+            columns.push({
+                header: `Soal #${idx + 1} [ID:${s.id}] (Maks: ${s.poin})`,
+                key: `soal_${s.id}`,
+                width: 25
+            });
+        });
+
+        worksheet.columns = columns;
+
+        siswaList.forEach(sw => {
+            const rowData = {
+                siswa_id: sw.siswa_id,
+                nis: sw.nis,
+                nama: sw.nama,
+                kelas: sw.kelas
+            };
+            const studentScores = skorMap[sw.siswa_id] || {};
+            soalList.forEach(s => {
+                rowData[`soal_${s.id}`] = studentScores[s.id] !== undefined ? studentScores[s.id] : '';
+            });
+            worksheet.addRow(rowData);
+        });
+
+        worksheet.getRow(1).font = { bold: true };
+        worksheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4E73DF' } };
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename=nilai_essay_${ujian.nama_ujian.replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`);
+        await workbook.xlsx.write(res);
+        res.end();
+    } catch (err) {
+        console.error('Error GET /guru/essay/:ujianId/export:', err);
+        res.status(500).send('Terjadi kesalahan saat mengekspor Excel');
+    }
+});
+
+// 5. Impor Nilai Essay dari Excel
+router.post('/essay/:ujianId/import', uploadEssay.single('file_excel'), async (req, res) => {
+    const guruId = req.session.guruId;
+    const ujianId = parseInt(req.params.ujianId);
+
+    const cleanup = () => {
+        if (req.file && req.file.path) {
+            try { if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path); } catch {}
+        }
+    };
+
+    try {
+        const authCheck = await checkGuruPengampuUjian(ujianId, guruId);
+        if (!authCheck.exists) {
+            cleanup();
+            return res.status(404).send('Ujian tidak ditemukan');
+        }
+        if (!authCheck.authorized) {
+            cleanup();
+            return res.status(403).send('Akses ditolak: Anda bukan guru pengampu ujian ini');
+        }
+
+        if (!req.file) {
+            return res.redirect(`/guru/essay/${ujianId}?error=` + encodeURIComponent('Silakan pilih file Excel'));
+        }
+
+        // Ambil daftar soal essay yang sah
+        const [soalList] = await pool.query(`
+            SELECT id, poin
+            FROM soal
+            WHERE ujian_id = ? AND tipe_soal = 'essay'
+        `, [ujianId]);
+
+        const maxPoinMap = new Map();
+        soalList.forEach(s => maxPoinMap.set(s.id, s.poin));
+
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.readFile(req.file.path);
+        const worksheet = workbook.worksheets[0];
+
+        if (!worksheet) {
+            cleanup();
+            return res.redirect(`/guru/essay/${ujianId}?error=` + encodeURIComponent('File Excel tidak memiliki lembar kerja'));
+        }
+
+        // Baca header di baris 1
+        const headerRow = worksheet.getRow(1);
+        let idSiswaColIdx = null;
+        let nisColIdx = null;
+        const soalColMap = new Map(); // colIndex => soalId
+
+        headerRow.eachCell((cell, colNumber) => {
+            const val = String(cell.value || '').trim();
+            if (val.toLowerCase().includes('id siswa')) {
+                idSiswaColIdx = colNumber;
+            } else if (val.toLowerCase() === 'nis') {
+                nisColIdx = colNumber;
+            }
+
+            const match = val.match(/\[ID:(\d+)\]/);
+            if (match) {
+                const soalId = parseInt(match[1]);
+                if (maxPoinMap.has(soalId)) {
+                    soalColMap.set(colNumber, soalId);
+                }
+            }
+        });
+
+        if (!idSiswaColIdx && !nisColIdx) {
+            cleanup();
+            return res.redirect(`/guru/essay/${ujianId}?error=` + encodeURIComponent('Header kolom ID Siswa atau NIS tidak ditemukan'));
+        }
+
+        // Buat lookup siswa berdasarkan NIS bila ID Siswa tidak ada
+        let nisToIdMap = new Map();
+        if (!idSiswaColIdx) {
+            const [allSiswa] = await pool.query('SELECT id, nis FROM siswa');
+            allSiswa.forEach(s => nisToIdMap.set(String(s.nis).trim(), s.id));
+        }
+
+        const pesertaSelesai = await ambilPesertaSelesai(ujianId);
+        const updatesToApply = []; // { siswaId, soalId, skor }
+        const affectedSiswaIds = new Set();
+        const errors = [];
+
+        worksheet.eachRow((row, rowNumber) => {
+            if (rowNumber === 1) return; // skip header
+
+            let siswaId = null;
+            if (idSiswaColIdx) {
+                const val = row.getCell(idSiswaColIdx).value;
+                if (val !== null && val !== undefined) siswaId = parseInt(val);
+            } else if (nisColIdx) {
+                const rawNis = String(row.getCell(nisColIdx).value || '').trim();
+                siswaId = nisToIdMap.get(rawNis);
+            }
+
+            if (!siswaId || isNaN(siswaId)) return;
+
+            if (!pesertaSelesai.has(siswaId)) {
+                errors.push(`Baris ${rowNumber}: siswa ID ${siswaId} bukan peserta ujian ini atau ujiannya belum selesai`);
+                return;
+            }
+
+            soalColMap.forEach((soalId, colNumber) => {
+                const rawScore = row.getCell(colNumber).value;
+                if (rawScore === null || rawScore === undefined || String(rawScore).trim() === '') return;
+
+                const score = Number(rawScore);
+                const maxPoin = maxPoinMap.get(soalId);
+
+                if (isNaN(score) || !Number.isInteger(score) || score < 0 || score > maxPoin) {
+                    errors.push(`Baris ${rowNumber}: Skor (${rawScore}) untuk Soal ID ${soalId} tidak valid (maks: ${maxPoin})`);
+                } else {
+                    updatesToApply.push({ siswaId, soalId, skor: score });
+                    affectedSiswaIds.add(siswaId);
+                }
+            });
+        });
+
+        if (errors.length > 0) {
+            cleanup();
+            return res.redirect(`/guru/essay/${ujianId}?error=` + encodeURIComponent(errors.slice(0, 3).join('; ')));
+        }
+
+        // Simpan semua nilai yang sah
+        for (const item of updatesToApply) {
+            await pool.query(`
+                INSERT INTO nilai_essay (siswa_id, ujian_id, soal_id, skor, dinilai_oleh, dinilai_pada)
+                VALUES (?, ?, ?, ?, ?, NOW())
+                ON DUPLICATE KEY UPDATE
+                  skor = VALUES(skor),
+                  dinilai_oleh = VALUES(dinilai_oleh),
+                  dinilai_pada = NOW()
+            `, [item.siswaId, ujianId, item.soalId, item.skor, guruId]);
+        }
+
+        // Hitung ulang nilai akhir untuk semua siswa terdampak
+        for (const sId of affectedSiswaIds) {
+            await hitungUlangNilai(sId, ujianId, pool);
+        }
+
+        cleanup();
+        res.redirect(`/guru/essay/${ujianId}?msg=` + encodeURIComponent(`Berhasil mengimpor nilai essay untuk ${affectedSiswaIds.size} siswa`));
+    } catch (err) {
+        cleanup();
+        console.error('Error POST /guru/essay/:ujianId/import:', err);
+        res.status(500).send('Terjadi kesalahan saat mengimpor nilai essay: ' + err.message);
+    }
 });
 
 module.exports = router;
