@@ -246,9 +246,13 @@ function renderSoal(soalList) {
 }
 
 // ── Timer ──
-function startTimer(durasiMenit) {
+function startTimer(durasiMenit, sisaDetik) {
     if (timerInterval) clearInterval(timerInterval);
-    waktuTersisa = durasiMenit * 60;
+    if (sisaDetik !== undefined && sisaDetik !== null) {
+        waktuTersisa = Math.max(0, parseInt(sisaDetik, 10));
+    } else {
+        waktuTersisa = (durasiMenit || 60) * 60;
+    }
     const timerEl = document.getElementById('timer');
     if (!timerEl) return;
 
@@ -392,9 +396,9 @@ socket.on('connect', () => {
     socket.emit('siswa-siap', { ujian_id: ujianId, siswa_id: siswaId });
 });
 
-socket.on('mulai-ujian', ({ durasi }) => {
-    console.log('mulai-ujian, durasi:', durasi);
-    startTimer(durasi);
+socket.on('mulai-ujian', ({ durasi, sisa_detik }) => {
+    console.log('mulai-ujian, sisa_detik:', sisa_detik, 'durasi:', durasi);
+    startTimer(durasi, sisa_detik);
     loadSoal();
     startPolling();
 });

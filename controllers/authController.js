@@ -60,31 +60,38 @@ exports.loginSiswa = async (req, res) => {
             return res.render('login', { error: 'Anda sudah mengerjakan ujian ini sebelumnya!' });
         }
 
-        // ── Cek sesi aktif ──
-        const [sesi] = await pool.query(
-            `SELECT id, status FROM sesi_ujian
-             WHERE siswa_id = ? AND ujian_id = ?`,
-            [siswaData.id, ujian_id]
-        );
+        // ── Ambil atau buat sesi ujian (Take-over jika sedang aktif, DESIGN §3.1) ──
+        const sesiService = require('../services/sesiService');
+        const deviceType = req.body.device_type || null;
+        const hasilSesi = await sesiService.mulaiAtauLanjut(siswaData.id, parseInt(ujian_id), deviceType, pool);
 
-        if (sesi.length > 0) {
-            if (sesi[0].status === 'sedang_ujian') {
-                return res.render('login', {
-                    error: 'Anda sedang dalam sesi ujian aktif. Hubungi pengawas jika ini kesalahan.'
-                });
-            }
-            if (sesi[0].status === 'keluar_paksa') {
-                return res.render('login', {
-                    error: 'Akses ujian Anda telah dicabut karena pelanggaran. Hubungi pengawas.'
-                });
-            }
+        if (hasilSesi.status === 'keluar_paksa') {
+            return res.render('login', {
+                error: hasilSesi.message || 'Akses ujian Anda telah dicabut karena pelanggaran. Hubungi pengawas.'
+            });
+        }
+        if (hasilSesi.status === 'selesai') {
+            return res.render('login', {
+                error: hasilSesi.message || 'Anda sudah menyelesaikan ujian ini.'
+            });
+        }
+
+        // Jika sesi diambil alih (take-over), catat ke log_kecurangan
+        if (hasilSesi.status === 'lanjut' && hasilSesi.takeOver) {
+            await pool.query(
+                `INSERT INTO log_kecurangan (siswa_id, ujian_id, jenis_kecurangan)
+                 VALUES (?, ?, 'ambil_alih_sesi')`,
+                [siswaData.id, parseInt(ujian_id)]
+            );
+            logger.info(`Sesi siswa NIS ${siswaData.nis} untuk ujian ID ${ujian_id} diambil alih`);
         }
 
         // ── Simpan session ──
-        req.session.siswaId   = siswaData.id;
-        req.session.siswaNama = siswaData.nama;
-        req.session.ujianId   = parseInt(ujian_id);
-        req.session.siswaNis  = siswaData.nis;
+        req.session.siswaId     = siswaData.id;
+        req.session.siswaNama   = siswaData.nama;
+        req.session.ujianId     = parseInt(ujian_id);
+        req.session.siswaNis    = siswaData.nis;
+        req.session.deviceToken = hasilSesi.sesi.device_token;
 
         req.session.save(err => {
             if (err) logger.error(`Session save error: ${err.message}`);

@@ -2,6 +2,7 @@ const express = require('express');
 const router  = express.Router();
 const pool    = require('../models/db');
 const { cekWaktuUjian } = require('../utils/helper');
+const { isSiswaAPI } = require('../middleware/auth');
 
 // ─────────────────────────────────────────────
 // FIX #3 — Rate limiter in-memory
@@ -27,7 +28,7 @@ setInterval(() => {
     for (const [key, val] of rateLimitMap.entries()) {
         if (now > val.resetAt) rateLimitMap.delete(key);
     }
-}, 5 * 60 * 1000);
+}, 5 * 60 * 1000).unref();
 
 // ─────────────────────────────────────────────
 // FIX #11 — Seed acak soal & pilihan disimpan
@@ -46,9 +47,6 @@ setInterval(() => {
 // Implementasi shuffle deterministik (seeded):
 // menggunakan algoritma Mulberry32 — ringan,
 // tidak butuh library tambahan.
-// ─────────────────────────────────────────────
-const seedMap = new Map(); // key: `${siswa_id}_${ujian_id}` → seed number
-
 function mulberry32(seed) {
     // Seeded PRNG — mengembalikan fungsi random() yang deterministik
     return function() {
@@ -69,24 +67,6 @@ function seededShuffle(array, rng) {
     return arr;
 }
 
-function getSeed(siswa_id, ujian_id) {
-    const key = `${siswa_id}_${ujian_id}`;
-    if (!seedMap.has(key)) {
-        // Buat seed baru — kombinasi timestamp + random agar unik per siswa
-        const seed = Math.floor(Math.random() * 2147483647);
-        seedMap.set(key, seed);
-    }
-    return seedMap.get(key);
-}
-
-// Bersihkan seed yang sudah tidak diperlukan setiap 2 jam
-// (setelah ujian selesai, siswa tidak akan akses lagi)
-setInterval(() => {
-    // Seed map ringan, cukup clear seluruhnya tiap 2 jam
-    // Tidak masalah karena ujian yang sudah selesai tidak bisa diakses ulang
-    seedMap.clear();
-}, 2 * 60 * 60 * 1000);
-
 
 // ─────────────────────────────────────────────
 // Daftar ujian aktif (tanpa auth — untuk login)
@@ -104,13 +84,58 @@ router.get('/daftar-ujian', async (req, res) => {
 
 
 // ─────────────────────────────────────────────
+// GET /api/sesi (DESIGN §4)
+// { status, sisa_detik, batas_waktu, jawaban_tersimpan }
+// ─────────────────────────────────────────────
+router.get('/sesi', isSiswaAPI, async (req, res) => {
+    try {
+        const siswaId = req.session.siswaId;
+        const ujianId = req.session.ujianId;
+        const sesiService = require('../services/sesiService');
+
+        const [sesiRows] = await pool.query(
+            'SELECT * FROM sesi_ujian WHERE siswa_id = ? AND ujian_id = ?',
+            [siswaId, ujianId]
+        );
+
+        if (sesiRows.length === 0) {
+            return res.status(404).json({ error: 'Sesi ujian tidak ditemukan' });
+        }
+
+        const sesi = sesiRows[0];
+        const sisa_detik = sesiService.hitungSisaDetik(sesi, new Date());
+
+        const [jawabanRows] = await pool.query(
+            'SELECT soal_id, jawaban_dipilih FROM jawaban_siswa WHERE siswa_id = ? AND ujian_id = ?',
+            [siswaId, ujianId]
+        );
+
+        const jawaban_tersimpan = {};
+        for (const row of jawabanRows) {
+            jawaban_tersimpan[row.soal_id] = row.jawaban_dipilih;
+        }
+
+        res.json({
+            status: sesi.status,
+            sisa_detik,
+            batas_waktu: sesi.batas_waktu,
+            jawaban_tersimpan
+        });
+    } catch (err) {
+        console.error('GET /api/sesi error:', err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+
+// ─────────────────────────────────────────────
 // GET /api/soal/:ujianId
 // FIX #1 — SELECT field eksplisit (jawaban_benar
 //           tidak dikirim ke client)
 // FIX #3 — Validasi ujianId milik session
 // FIX #11 — Urutan acak konsisten via seeded RNG
 // ─────────────────────────────────────────────
-router.get('/soal/:ujianId', async (req, res) => {
+router.get('/soal/:ujianId', isSiswaAPI, async (req, res) => {
     const ujianId  = req.params.ujianId;
     const siswa_id = req.session.siswaId;
 
@@ -150,10 +175,20 @@ router.get('/soal/:ujianId', async (req, res) => {
         const acakSoal    = ujianRow[0]?.acak_soal    == 1;
         const acakPilihan = ujianRow[0]?.acak_pilihan == 1;
 
-        // FIX #11 — Ambil seed yang sudah ada atau buat baru
-        // Seed SAMA untuk siswa yang sama di ujian yang sama
-        const seed = getSeed(siswa_id, ujianId);
-        const rng  = mulberry32(seed);
+        // T1.5 — Ambil seed acak persisten dari database sesi_ujian
+        const [sesiSeedRows] = await pool.query(
+            `SELECT seed FROM sesi_ujian WHERE siswa_id = ? AND ujian_id = ?`,
+            [siswa_id, ujianId]
+        );
+        let seed = sesiSeedRows[0]?.seed;
+        if (!seed) {
+            seed = Math.floor(Math.random() * 2147483647);
+            await pool.query(
+                `UPDATE sesi_ujian SET seed = ? WHERE siswa_id = ? AND ujian_id = ?`,
+                [seed, siswa_id, ujianId]
+            );
+        }
+        const rng = mulberry32(seed);
 
         if (acakSoal) {
             soal = seededShuffle(soal, rng);
@@ -213,7 +248,7 @@ router.get('/soal/:ujianId', async (req, res) => {
 // FIX #2 — Tidak ada data jawaban di response
 // FIX #3 — Rate limit + validasi soal milik ujian
 // ─────────────────────────────────────────────
-router.post('/simpan-jawaban', async (req, res) => {
+router.post('/simpan-jawaban', isSiswaAPI, async (req, res) => {
     const { ujian_id, soal_id, jawaban } = req.body;
 
     if (!req.session.siswaId) {

@@ -3,6 +3,7 @@ const bcrypt = require('bcrypt');
 require('dotenv').config();
 
 const TEST_DB_NAME = process.env.DB_NAME_TEST || 'cbt_sekolah_test';
+process.env.DB_NAME = TEST_DB_NAME;
 
 let testPool = null;
 
@@ -85,6 +86,13 @@ async function seedSyntheticData(pool = getTestPool()) {
     );
     const ujianId = resUjian.insertId;
 
+    // 7. Soal sintetis
+    const [resSoal] = await pool.query(
+        `INSERT INTO soal (ujian_id, tipe_soal, teks_soal, poin, pilihan_a, pilihan_b, pilihan_c, pilihan_d, jawaban_benar)
+         VALUES (?, 'pg', '1 + 1 = ?', 2, '1', '2', '3', '4', 'B')`,
+        [ujianId]
+    );
+
     return {
         kelasAId,
         kelasBId,
@@ -92,6 +100,7 @@ async function seedSyntheticData(pool = getTestPool()) {
         guruId,
         pengajaranId,
         ujianId,
+        soalId: resSoal.insertId,
         siswa1Id: resSiswa1.insertId,
         siswa2Id: resSiswa2.insertId,
         defaultPin: '1234'
@@ -103,6 +112,12 @@ async function closeTestPool() {
         await testPool.end();
         testPool = null;
     }
+    try {
+        const modelsPool = require('../../models/db');
+        if (modelsPool && typeof modelsPool.end === 'function') {
+            await modelsPool.end();
+        }
+    } catch (_) {}
 }
 
 module.exports = {

@@ -160,24 +160,37 @@ io.on('connection', (socket) => {
                 return;
             }
 
-            const [rows] = await pool.query(
-                `SELECT durasi FROM ujian WHERE id = ?`,
-                [ujian_id]
+            const sesiService = require('./services/sesiService');
+            let [sesiRows] = await pool.query(
+                `SELECT s.*, u.durasi, u.tanggal_mulai, u.tanggal_selesai
+                 FROM sesi_ujian s
+                 JOIN ujian u ON s.ujian_id = u.id
+                 WHERE s.siswa_id = ? AND s.ujian_id = ?`,
+                [siswa_id, ujian_id]
             );
-            const durasi = rows[0]?.durasi || 5;
 
-            // FIX #12 — INSERT sesi_ujian agar validasi sesi di login berfungsi.
-            // ON DUPLICATE KEY UPDATE supaya tidak error jika reconnect.
+            let sesi;
+            if (sesiRows.length === 0) {
+                const hasil = await sesiService.mulaiAtauLanjut(siswa_id, ujian_id, null, pool);
+                sesi = hasil.sesi;
+            } else {
+                sesi = sesiRows[0];
+            }
+
+            // Update socket_id dan last_seen tanpa mereset status atau waktu_mulai
             await pool.query(
-                `INSERT INTO sesi_ujian (siswa_id, ujian_id, socket_id, waktu_mulai, status)
-                 VALUES (?, ?, ?, NOW(), 'sedang_ujian')
-                 ON DUPLICATE KEY UPDATE
-                   socket_id   = VALUES(socket_id),
-                   status      = IF(status = 'keluar_paksa', 'keluar_paksa', 'sedang_ujian')`,
-                [siswa_id, ujian_id, socket.id]
+                `UPDATE sesi_ujian
+                 SET socket_id = ?, last_seen = NOW()
+                 WHERE id = ?`,
+                [socket.id, sesi.id]
             );
 
-            socket.emit('mulai-ujian', { durasi });
+            const sisa_detik = sesiService.hitungSisaDetik(sesi, new Date());
+            socket.emit('mulai-ujian', {
+                durasi: sesi.durasi,
+                sisa_detik,
+                batas_waktu: sesi.batas_waktu
+            });
 
         } catch (err) {
             console.error('siswa-siap error:', err);
@@ -280,8 +293,20 @@ io.on('connection', (socket) => {
     });
 
     // ── disconnect ──
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
         console.log('Socket disconnected:', socket.id);
+        const data = sessionSocketMap.get(socket.id);
+        if (data && data.siswa_id && data.ujian_id) {
+            try {
+                const pool = require('./models/db');
+                await pool.query(
+                    'UPDATE sesi_ujian SET last_seen = NOW() WHERE siswa_id = ? AND ujian_id = ?',
+                    [data.siswa_id, data.ujian_id]
+                );
+            } catch (err) {
+                console.error('disconnect last_seen update error:', err);
+            }
+        }
         sessionSocketMap.delete(socket.id);
     });
 });

@@ -69,28 +69,28 @@ Kolom **Dep** = item yang harus `DONE` lebih dulu. **Owner** `G` = Gemini, `U` =
 ### T1.1 Migrasi 001 — Owner: G — Dep: T0.8
 - Sesuai ERD §3 (`001_ketahanan_sesi.sql`).
 - **Terima:** migrasi berjalan di DB dev dan uji; kolom sesuai ERD; data lama tidak hilang.
-- Status: `TODO`
+- Status: `DONE`
 
 ### T1.2 `services/sesiService.js` — Owner: G — Dep: T1.1, T0.7
 - Fungsi: `mulaiAtauLanjut(siswaId, ujianId, deviceType)`, `hitungSisaDetik(sesi, now)`, `ambilAlih(sesi)`, `perpanjang(sesi, menit)`, `bolehTerimaJawaban(sesi, clientTs, now)` (grace 120 dtk dari config).
 - `batas_waktu = waktu_mulai + durasi + tambahan_menit`, tidak melewati `ujian.tanggal_selesai` (D-007).
 - **Terima:** unit test: sisa waktu tidak berubah saat dipanggil ulang; take-over mengganti `device_token`; jawaban dengan `client_ts` ≤ batas diterima dalam grace dan ditolak sesudahnya; `keluar_paksa`/`selesai` ditolak.
-- Status: `TODO`
+- Status: `DONE`
 
 ### T1.3 Login melanjutkan sesi — Owner: G — Dep: T1.2, T0.3
 - `authController`: ganti blokir "sesi aktif" dengan take-over (DESIGN §3.1); simpan `device_token` di session; catat pengambilalihan ke `log_kecurangan` atau log khusus.
 - **Terima:** login → tutup tab → login lagi: sesi berlanjut, `waktu_mulai` tidak berubah; perangkat lama menerima 409 pada request berikutnya.
-- Status: `TODO`
+- Status: `DONE`
 
 ### T1.4 `GET /api/sesi` dan socket tanpa durasi penuh — Owner: G — Dep: T1.3
 - `routes/api.js`: endpoint sesuai DESIGN §4. `app.js`: `siswa-siap` tidak lagi mengirim `durasi` penuh; kirim `sisa_detik`; `disconnect` memperbarui `last_seen` (tanpa mengubah status).
 - **Terima:** sambung ulang socket tidak mereset hitung mundur (uji manual + test).
-- Status: `TODO`
+- Status: `DONE`
 
 ### T1.5 Seed acak di DB — Owner: G — Dep: T1.1
 - Hapus `seedMap` di `routes/api.js`; pakai `sesi_ujian.seed`.
 - **Terima:** urutan soal/pilihan identik sebelum dan sesudah restart server untuk siswa yang sama; berbeda antar siswa.
-- Status: `TODO`
+- Status: `DONE`
 
 ### T1.6 `POST /api/sinkron-jawaban` — Owner: G — Dep: T1.2
 - Batch upsert idempoten, cek `device_token`, `bolehTerimaJawaban`, validasi `soal_id` milik ujian; **hitung `is_benar` di server**; jangan kembalikan kunci. Batasi ukuran batch (mis. 100).
@@ -313,6 +313,36 @@ _(Gemini: tulis ide/risiko di luar lingkup di sini; jangan dikerjakan.)_
 ### Laporan eksekusi T0.9
 - Diubah: `README.md`.
 - Verifikasi: Panduan instalasi diperbarui menyertakan impor `database/schema.sql` dan eksekusi `npm run migrate`; instruksi automated test (`npm test`) menggunakan database uji `cbt_sekolah_test` ditambahkan; klaim usang (seperti ketiadaan automated testing dan akun demo) dihapus; tautan lengkap ke seluruh dokumen spesifikasi di folder `docs/` (PRD, DESIGN, ERD, DECISION, RULES_AI, TODO) telah dicantumkan.
+- Penyimpangan dari rencana: tidak ada.
+- Belum diverifikasi: tidak ada.
+
+### Laporan eksekusi T1.1
+- Diubah: `database/migrations/001_ketahanan_sesi.sql` (dibuat).
+- Verifikasi: File migrasi diterapkan berhasil pada database dev (`cbt_sekolah`) dan database uji (`cbt_sekolah_test`); kolom baru (`batas_waktu`, `tambahan_menit`, `seed`, `device_token`, `device_type`, `last_seen`, `selesai_pada` di `sesi_ujian` dan `client_ts`, `diperbarui_pada` di `jawaban_siswa`, serta tabel `sessions`) terverifikasi ada via `DESCRIBE`; data yang sudah ada tidak hilang; `npm test` lulus 7 dari 7 pengujian.
+- Penyimpangan dari rencana: tidak ada.
+- Belum diverifikasi: tidak ada.
+
+### Laporan eksekusi T1.2
+- Diubah: `services/sesiService.js` (dibuat), `tests/sesi_service.test.js` (dibuat), `package.json`.
+- Verifikasi: `services/sesiService.js` dibuat mengimplementasikan fungsi `mulaiAtauLanjut`, `hitungBatasWaktu`, `hitungSisaDetik`, `bolehTerimaJawaban`, `ambilAlih`, dan `perpanjang`; unit test murni dan integrasi database (`tests/sesi_service.test.js`) membuktikan: penghitungan batas waktu tidak melewati `ujian.tanggal_selesai` (D-007), sisa waktu server-authoritative dihitung akurat, penerimaan jawaban dalam grace 120 detik hanya untuk `client_ts <= batas_waktu` (D-009) dan ditolak setelah grace habis, penolakan status `keluar_paksa` dan `selesai`, penerbitan `device_token` baru saat take-over tanpa mereset waktu, serta pemanjangan batas waktu oleh fungsi perpanjang; `package.json` ditambahkan flag `--test-concurrency=1` untuk mencegah race condition pada DB uji; `npm test` lulus 19 dari 19 pengujian di 4 test suites; `node --check` bersih.
+- Penyimpangan dari rencana: Menambahkan opsi `--test-concurrency=1` pada script test untuk eksekusi sekuensial suite test DB.
+- Belum diverifikasi: tidak ada.
+
+### Laporan eksekusi T1.3
+- Diubah: `controllers/authController.js`, `middleware/auth.js`, `routes/api.js`, `tests/takeover_login.test.js` (dibuat).
+- Verifikasi: Alur blokir "sesi aktif" di `controllers/authController.js` digantikan dengan mekanisme take-over via `sesiService.mulaiAtauLanjut`; `device_token` disimpan di `req.session.deviceToken`; setiap take-over tercatat di `log_kecurangan` dengan `jenis_kecurangan = 'ambil_alih_sesi'`; middleware `isSiswaAPI` di `middleware/auth.js` dan `routes/api.js` memvalidasi kesesuaian `device_token` dan mengembalikan respons HTTP 409 bila sesi diambil alih di perangkat lain; pengujian integrasi (`tests/takeover_login.test.js`) memverifikasi bahwa siswa login pertama kali mendapatkan token A, saat login kedua (mis. di perangkat B) sesi berlanjut dengan `waktu_mulai` dan `batas_waktu` tidak berubah, dan perangkat A menerima HTTP 409 pada permintaan berikutnya; `npm test` lulus 20 dari 20 pengujian di 5 test suites.
+- Penyimpangan dari rencana: tidak ada.
+- Belum diverifikasi: tidak ada.
+
+### Laporan eksekusi T1.4
+- Diubah: `routes/api.js`, `app.js`, `public/js/ujian.js`, `tests/sesi_endpoint_socket.test.js` (dibuat).
+- Verifikasi: Endpoint `GET /api/sesi` diimplementasikan sesuai DESIGN §4, mengembalikan `{ status, sisa_detik, batas_waktu, jawaban_tersimpan }`; handler socket `siswa-siap` di `app.js` tidak lagi mengirim durasi penuh atau mereset waktu, melainkan mengirim `sisa_detik` server-authoritative yang dihitung dari `batas_waktu`; handler `disconnect` di `app.js` memperbarui `last_seen` di DB tanpa mengubah status sesi; `public/js/ujian.js` diperbarui agar fungsi timer menerima `sisa_detik` dari event socket; pengujian otomatis (`tests/sesi_endpoint_socket.test.js`) memverifikasi format respons endpoint `/api/sesi`, pencatatan `last_seen` saat socket disconnect, dan bahwa reconnect berkali-kali tidak pernah mereset hitung mundur; `npm test` lulus 22 dari 22 pengujian di 6 test suites; `node --check` bersih pada semua berkas.
+- Penyimpangan dari rencana: Pengujian socket dilakukan menggunakan event handler internal Node.js tanpa menambah dependensi eksternal.
+- Belum diverifikasi: tidak ada.
+
+### Laporan eksekusi T1.5
+- Diubah: `routes/api.js`, `tests/persistent_seed.test.js` (dibuat).
+- Verifikasi: Struktur data in-memory `seedMap` dan timer pembersihnya dihapus dari `routes/api.js`; pembacaan seed untuk pengacakan soal dan pilihan dialihkan ke kolom persisten `sesi_ujian.seed` di database; pengujian otomatis (`tests/persistent_seed.test.js`) memverifikasi bahwa ketika server dimatikan dan instance server baru dijalankan (simulasi restart penuh), urutan soal dan pilihan untuk siswa yang sama tetap 100% identik sebelum dan sesudah restart; pada saat yang sama, siswa lain mendapatkan seed yang berbeda sehingga susunan soalnya berbeda; `npm test` lulus 23 dari 23 pengujian di 7 test suites; `node --check` bersih.
 - Penyimpangan dari rencana: tidak ada.
 - Belum diverifikasi: tidak ada.
 
