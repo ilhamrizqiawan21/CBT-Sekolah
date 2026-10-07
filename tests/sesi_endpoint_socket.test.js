@@ -1,6 +1,7 @@
 const { test, describe, before, after, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('http');
+const path = require('path');
 const express = require('express');
 const session = require('express-session');
 const { EventEmitter } = require('events');
@@ -30,7 +31,7 @@ describe('Endpoint GET /api/sesi dan Socket Timer (T1.4)', () => {
             cookie: { httpOnly: true, sameSite: 'lax' }
         }));
 
-        app.set('views', '/home/ilhamzp/Projects/CBT-Sekolah/views');
+        app.set('views', path.join(__dirname, '..', 'views'));
         app.set('view engine', 'ejs');
 
         const authController = require('../controllers/authController');

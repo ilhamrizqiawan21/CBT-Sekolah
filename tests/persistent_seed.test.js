@@ -1,6 +1,7 @@
 const { test, describe, before, after, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('http');
+const path = require('path');
 const express = require('express');
 const session = require('express-session');
 const {
@@ -53,7 +54,7 @@ describe('Seed Acak Persisten di Database (T1.5)', () => {
             saveUninitialized: false,
             cookie: { httpOnly: true, sameSite: 'lax' }
         }));
-        app.set('views', '/home/ilhamzp/Projects/CBT-Sekolah/views');
+        app.set('views', path.join(__dirname, '..', 'views'));
         app.set('view engine', 'ejs');
 
         const authController = require('../controllers/authController');

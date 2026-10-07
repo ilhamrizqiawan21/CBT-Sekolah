@@ -72,13 +72,7 @@ const { cekWaktuUjian } = require('./utils/helper');
 // hanya di handler pindah_tab.
 // ─────────────────────────────────────────────────────────────
 async function hitungTotalPelanggaran(pool, siswa_id, ujian_id) {
-    const [rows] = await pool.query(
-        `SELECT COUNT(*) AS jumlah
-         FROM log_kecurangan
-         WHERE siswa_id = ? AND ujian_id = ?`,
-        [siswa_id, ujian_id]
-    );
-    return rows[0].jumlah;
+    return require('./services/sesiService').hitungPelanggaran(siswa_id, ujian_id, pool);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -384,6 +378,13 @@ app.use((err, req, res, next) => {
         error:   isDevelopment ? err : { status: err.status || 500 }
     });
 });
+
+// ─────────────────────────────────────────────────────────────
+// Background Job Penutupan Otomatis (DESIGN §3.4, T1.8)
+// Memeriksa dan memfinalisasi sesi yang melewati batas waktu + grace
+// ─────────────────────────────────────────────────────────────
+const { startAutoFinalizeJob } = require('./services/finalizeService');
+startAutoFinalizeJob(pool, 30000);
 
 server.listen(process.env.PORT, () => {
     console.log(`Server berjalan di http://localhost:${process.env.PORT}`);

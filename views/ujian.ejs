@@ -133,6 +133,29 @@
         @keyframes blinkBorder{ 0%,100%{border-color:rgba(224,49,49,.2)} 50%{border-color:var(--danger)} }
         #fs-indicator i{ font-size:.8rem; }
 
+        /* Indikator sinkronisasi di topbar (T1.7) */
+        #sync-indicator{
+            display:flex; align-items:center; gap:.35rem;
+            font-size:.72rem; font-weight:600;
+            padding:.25rem .65rem; border-radius:20px;
+            border:1px solid transparent;
+            transition:all .3s; user-select:none;
+        }
+        #sync-indicator.sync-saved{
+            color:var(--success); background:var(--success-light);
+            border-color:rgba(12,166,120,.2);
+        }
+        #sync-indicator.sync-saving{
+            color:var(--primary); background:var(--primary-light);
+            border-color:rgba(59,91,219,.2);
+        }
+        #sync-indicator.sync-offline{
+            color:var(--warning); background:var(--warning-light);
+            border-color:rgba(230,119,0,.3);
+            animation:blinkBorder .8s infinite;
+        }
+        #sync-indicator i{ font-size:.8rem; }
+
         /* Timer */
         #timer{
             font-family:var(--font-heading); font-size:1.4rem; font-weight:800;
@@ -293,6 +316,11 @@
         </div>
     </div>
     <div class="exam-topbar-right">
+        <!-- Indikator sinkronisasi jawaban (T1.7) -->
+        <div id="sync-indicator" class="sync-saved" title="Status penyimpanan jawaban">
+            <i class="bi bi-cloud-check-fill" id="sync-icon"></i>
+            <span id="sync-indicator-txt">Tersimpan</span>
+        </div>
         <!-- Indikator fullscreen — klik untuk masuk kembali -->
         <div id="fs-indicator" class="fs-off" title="Klik untuk masuk layar penuh" role="button" tabindex="0">
             <i class="bi bi-fullscreen-exit"></i>

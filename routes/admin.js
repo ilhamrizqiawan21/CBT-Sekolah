@@ -456,9 +456,105 @@ router.get('/log-kecurangan', async (req, res) => {
     res.render('admin/log_kecurangan', { log, ujianList, filterUjian, filterJenis, msg: req.query.msg, error: req.query.error });
 });
 
+// ─────────────────────────────────────────────
+// POST /admin/api/sesi/:id/buka-kunci (DESIGN §3.6, §4, T1.9)
+// Membuka sesi yang keluar_paksa -> sedang_ujian tanpa hapus data
+// ─────────────────────────────────────────────
+router.post('/api/sesi/:id/buka-kunci', async (req, res) => {
+    const sesiId = parseInt(req.params.id, 10);
+    if (isNaN(sesiId)) {
+        return res.status(400).json({ error: 'ID sesi tidak valid' });
+    }
+
+    try {
+        const [rows] = await pool.query(
+            `SELECT s.*, sw.nama, sw.nis, u.nama_ujian
+             FROM sesi_ujian s
+             JOIN siswa sw ON s.siswa_id = sw.id
+             JOIN ujian u ON s.ujian_id = u.id
+             WHERE s.id = ?`,
+            [sesiId]
+        );
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Sesi ujian tidak ditemukan' });
+        }
+
+        const sesi = rows[0];
+
+        if (sesi.status !== 'keluar_paksa') {
+            return res.status(409).json({ error: 'Sesi tidak dalam status terkunci (keluar_paksa)' });
+        }
+
+        // Ubah status dari keluar_paksa menjadi sedang_ujian tanpa menghapus jawaban
+        const [upd] = await pool.query(
+            `UPDATE sesi_ujian
+             SET status = 'sedang_ujian'
+             WHERE id = ? AND status = 'keluar_paksa'`,
+            [sesiId]
+        );
+        if (upd.affectedRows === 0) {
+            return res.status(409).json({ error: 'Sesi tidak dalam status terkunci (keluar_paksa)' });
+        }
+
+        // Penanda: pelanggaran sebelum ini tidak dihitung lagi (log lama tetap tersimpan)
+        await pool.query(
+            `INSERT INTO log_kecurangan (siswa_id, ujian_id, jenis_kecurangan)
+             VALUES (?, ?, 'buka_kunci')`,
+            [sesi.siswa_id, sesi.ujian_id]
+        );
+
+        // Catat ke audit_admin jika tabel tersedia
+        try {
+            await pool.query(`
+                CREATE TABLE IF NOT EXISTS audit_admin (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    admin_id INT NULL,
+                    sesi_id INT NOT NULL,
+                    aksi VARCHAR(50) NOT NULL,
+                    detail TEXT NULL,
+                    dibuat_pada TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_audit_sesi (sesi_id)
+                ) ENGINE=InnoDB;
+            `);
+            await pool.query(
+                `INSERT INTO audit_admin (admin_id, sesi_id, aksi, detail)
+                 VALUES (?, ?, 'buka-kunci', ?)`,
+                [
+                    req.session.adminId || null,
+                    sesiId,
+                    `Buka kunci sesi siswa NIS ${sesi.nis} (${sesi.nama}) untuk ujian ${sesi.nama_ujian}`
+                ]
+            );
+        } catch (auditErr) {
+            logger.warn(`Gagal mencatat audit_admin: ${auditErr.message}`);
+        }
+
+        logger.info(`Admin ${req.session.adminId || 'unknown'} membuka kunci sesi ID ${sesiId} (Siswa: ${sesi.nis})`);
+
+        res.json({
+            success: true,
+            message: 'Kunci sesi berhasil dibuka, siswa dapat melanjutkan ujian',
+            sesi_id: sesiId,
+            status: 'sedang_ujian'
+        });
+
+    } catch (err) {
+        logger.error(`buka-kunci sesi error: ${err.message}`);
+        res.status(500).json({ error: 'Gagal membuka kunci sesi' });
+    }
+});
+
+// Reset ujian lama (diberi proteksi konfirmasi ekstra, bukan jalan utama — T1.9)
 router.post('/reset-ujian', async (req, res) => {
-    const { siswa_id, ujian_id } = req.body;
+    const { siswa_id, ujian_id, konfirmasi } = req.body;
     if (!siswa_id || !ujian_id) return res.redirect('/admin/hasil?error=Data tidak lengkap');
+
+    // Jika konfirmasi disertakan namun tidak bernilai 'YAKIN', tolak penghapusan
+    if (konfirmasi !== undefined && konfirmasi !== 'YAKIN') {
+        return res.redirect('/admin/hasil?error=Konfirmasi reset harus berupa kata YAKIN');
+    }
+
     try {
         await pool.query('DELETE FROM jawaban_siswa WHERE siswa_id = ? AND ujian_id = ?', [siswa_id, ujian_id]);
         await pool.query('DELETE FROM nilai_ujian WHERE siswa_id = ? AND ujian_id = ?', [siswa_id, ujian_id]);

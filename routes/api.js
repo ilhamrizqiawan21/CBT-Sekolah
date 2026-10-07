@@ -243,6 +243,223 @@ router.get('/soal/:ujianId', isSiswaAPI, async (req, res) => {
 });
 
 
+function hitungIsBenar(soal, jawaban) {
+    if (!soal) return 0;
+    const tipe = soal.tipe_soal;
+    if (tipe === 'pg') {
+        const jUser = String(jawaban !== undefined && jawaban !== null ? jawaban : '').trim().toUpperCase();
+        const jBenar = String(soal.jawaban_benar || '').trim().toUpperCase();
+        return jUser === jBenar ? 1 : 0;
+    }
+    if (tipe === 'menjodohkan') {
+        try {
+            const jUser = typeof jawaban === 'string' ? JSON.parse(jawaban || '[]') : (jawaban || []);
+            const jBenar = JSON.parse(soal.jawaban_benar || '[]');
+            if (!Array.isArray(jUser) || !Array.isArray(jBenar)) return 0;
+            const sortPairs = arr => [...arr].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+            return JSON.stringify(sortPairs(jUser)) === JSON.stringify(sortPairs(jBenar)) ? 1 : 0;
+        } catch {
+            return 0;
+        }
+    }
+    if (tipe === 'essay') {
+        // D-006: Essay dijawab di kertas, dinilai guru per soal (0–4)
+        return null;
+    }
+    return 0;
+}
+
+// ─────────────────────────────────────────────
+// POST /api/sinkron-jawaban (DESIGN §3.3, §4, T1.6)
+// Batch upsert idempoten, validasi soal, timer server
+// ─────────────────────────────────────────────
+router.post('/sinkron-jawaban', isSiswaAPI, async (req, res) => {
+    try {
+        const siswa_id = req.session.siswaId;
+        const ujian_id = req.session.ujianId;
+        const sesiService = require('../services/sesiService');
+
+        const items = Array.isArray(req.body)
+            ? req.body
+            : (req.body.jawaban || req.body.items || null);
+
+        if (!Array.isArray(items)) {
+            return res.status(400).json({ error: 'Format data tidak valid, harus berupa array jawaban' });
+        }
+
+        // Batasi ukuran batch (maksimal 100)
+        if (items.length > 100) {
+            return res.status(400).json({ error: 'Ukuran batch melebihi batas maksimal 100 item' });
+        }
+
+        if (items.length === 0) {
+            return res.json({ success: true, tersinkron: 0, diabaikan: 0, total: 0 });
+        }
+
+        // Ambil sesi ujian siswa
+        const [sesiRows] = await pool.query(
+            'SELECT * FROM sesi_ujian WHERE siswa_id = ? AND ujian_id = ?',
+            [siswa_id, ujian_id]
+        );
+        if (sesiRows.length === 0) {
+            return res.status(404).json({ error: 'Sesi ujian tidak ditemukan' });
+        }
+        const sesi = sesiRows[0];
+        const now = new Date();
+
+        if (sesi.status !== 'sedang_ujian') {
+            return res.status(403).json({ error: 'Sesi ujian tidak aktif atau sudah selesai' });
+        }
+
+        // Cek apakah waktu server sudah melewati batas_waktu + grace period (D-009)
+        const batasMs = new Date(sesi.batas_waktu).getTime();
+        const graceMs = (parseInt(process.env.GRACE_PERIOD_DETIK, 10) || sesiService.DEFAULT_GRACE_DETIK || 120) * 1000;
+        if (now.getTime() > (batasMs + graceMs)) {
+            return res.status(403).json({
+                error: 'Waktu ujian telah berakhir dan melewati batas toleransi',
+                code: 'waktu_habis'
+            });
+        }
+
+        // Validasi semua soal_id di batch
+        const soalIds = [];
+        for (const item of items) {
+            if (!item || item.soal_id === undefined || item.soal_id === null || isNaN(parseInt(item.soal_id))) {
+                return res.status(400).json({ error: 'Item jawaban tidak lengkap atau soal_id tidak valid' });
+            }
+            soalIds.push(parseInt(item.soal_id));
+        }
+
+        const uniqueSoalIds = [...new Set(soalIds)];
+        const [soalRows] = await pool.query(
+            `SELECT id, tipe_soal, jawaban_benar, opsi_tambahan
+             FROM soal
+             WHERE id IN (?) AND ujian_id = ?`,
+            [uniqueSoalIds, ujian_id]
+        );
+
+        const soalMap = new Map();
+        for (const s of soalRows) {
+            soalMap.set(s.id, s);
+        }
+
+        // Validasi bahwa SEMUA soal_id milik ujian_id ini (soal ujian lain ditolak)
+        for (const sid of uniqueSoalIds) {
+            if (!soalMap.has(sid)) {
+                return res.status(400).json({
+                    error: `Soal ID ${sid} tidak ditemukan atau bukan milik ujian ini`
+                });
+            }
+        }
+
+        // Ambil jawaban yang sudah tersimpan saat ini untuk mengecek timestamp
+        const [existingJawaban] = await pool.query(
+            `SELECT soal_id, jawaban_dipilih, client_ts
+             FROM jawaban_siswa
+             WHERE siswa_id = ? AND ujian_id = ? AND soal_id IN (?)`,
+            [siswa_id, ujian_id, uniqueSoalIds]
+        );
+
+        const existingMap = new Map();
+        for (const row of existingJawaban) {
+            existingMap.set(row.soal_id, row);
+        }
+
+        let tersinkronCount = 0;
+        let diabaikanCount = 0;
+
+        for (const item of items) {
+            const sid = parseInt(item.soal_id);
+            const soal = soalMap.get(sid);
+
+            const rawTs = item.client_ts ? new Date(item.client_ts) : now;
+            // Klien tidak boleh mengklaim waktu di masa depan (mengunci jawaban berikutnya)
+            const clientTs = isNaN(rawTs.getTime()) || rawTs.getTime() > now.getTime() ? now : rawTs;
+
+            // Cek apakah jawaban boleh diterima (timer & grace period)
+            const izin = sesiService.bolehTerimaJawaban(sesi, clientTs, now);
+            if (!izin.boleh) {
+                diabaikanCount++;
+                continue;
+            }
+
+            // Cek client_ts: timestamp yang lebih lama TIDAK boleh menimpa yang lebih baru
+            const existing = existingMap.get(sid);
+            if (existing && existing.client_ts) {
+                const existingTime = new Date(existing.client_ts).getTime();
+                const incomingTime = clientTs.getTime();
+                if (incomingTime < existingTime) {
+                    diabaikanCount++;
+                    continue;
+                }
+            }
+
+            // Hitung is_benar di sisi server (kunci jawaban tidak dibocorkan)
+            const isBenar = hitungIsBenar(soal, item.jawaban);
+            const jawabanStr = typeof item.jawaban === 'object'
+                ? JSON.stringify(item.jawaban)
+                : (item.jawaban !== undefined && item.jawaban !== null ? String(item.jawaban) : '');
+
+            await pool.query(
+                `INSERT INTO jawaban_siswa (siswa_id, ujian_id, soal_id, jawaban_dipilih, is_benar, client_ts)
+                 VALUES (?, ?, ?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE
+                   jawaban_dipilih = VALUES(jawaban_dipilih),
+                   is_benar        = VALUES(is_benar),
+                   client_ts       = VALUES(client_ts)`,
+                [siswa_id, ujian_id, sid, jawabanStr, isBenar, clientTs]
+            );
+
+            existingMap.set(sid, {
+                soal_id: sid,
+                jawaban_dipilih: jawabanStr,
+                client_ts: clientTs
+            });
+
+            tersinkronCount++;
+        }
+
+        // Perbarui last_seen pada sesi_ujian
+        await pool.query(
+            'UPDATE sesi_ujian SET last_seen = NOW() WHERE id = ?',
+            [sesi.id]
+        );
+
+        // Berikan respons konfirmasi tanpa membocorkan jawaban_benar / kunci
+        res.json({
+            success: true,
+            tersinkron: tersinkronCount,
+            diabaikan: diabaikanCount,
+            total: items.length
+        });
+
+    } catch (err) {
+        console.error('POST /sinkron-jawaban error:', err);
+        res.status(500).json({ error: 'Gagal sinkron jawaban' });
+    }
+});
+
+
+// ─────────────────────────────────────────────
+// POST /api/heartbeat (DESIGN §3.3, §4)
+// Perbarui last_seen sesi siswa
+// ─────────────────────────────────────────────
+router.post('/heartbeat', isSiswaAPI, async (req, res) => {
+    try {
+        const siswa_id = req.session.siswaId;
+        const ujian_id = req.session.ujianId;
+        await pool.query(
+            'UPDATE sesi_ujian SET last_seen = NOW() WHERE siswa_id = ? AND ujian_id = ?',
+            [siswa_id, ujian_id]
+        );
+        res.json({ success: true, timestamp: new Date() });
+    } catch (err) {
+        console.error('POST /heartbeat error:', err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+
 // ─────────────────────────────────────────────
 // POST /api/simpan-jawaban
 // FIX #2 — Tidak ada data jawaban di response
@@ -339,59 +556,17 @@ router.post('/simpan-jawaban', isSiswaAPI, async (req, res) => {
 
 
 // ─────────────────────────────────────────────
-// POST /api/selesai-ujian
-// FIX #10 — Endpoint ini WAJIB dipanggil oleh
-// client sebelum emit socket 'selesai-ujian'.
-// Setelah nilai tersimpan, seed siswa dihapus
-// dari seedMap (ujian sudah selesai).
+// POST /api/selesai-ujian (DESIGN §3.4, §3.5, T1.8)
+// Finalisasi sesi ujian siswa dan simpan nilai
 // ─────────────────────────────────────────────
-router.post('/selesai-ujian', async (req, res) => {
-    if (!req.session.siswaId) {
-        return res.status(401).json({ error: 'Unauthorized' });
-    }
-
+router.post('/selesai-ujian', isSiswaAPI, async (req, res) => {
     const siswa_id = req.session.siswaId;
     const ujian_id = req.session.ujianId;
 
-    const isValid = await cekWaktuUjian(ujian_id);
-    if (!isValid) {
-        return res.status(403).json({ error: 'Waktu ujian habis' });
-    }
-
     try {
-        const [jawaban] = await pool.query(
-            `SELECT is_benar FROM jawaban_siswa WHERE siswa_id = ? AND ujian_id = ?`,
-            [siswa_id, ujian_id]
-        );
-        const [totalSoalRow] = await pool.query(
-            `SELECT COUNT(*) as total, SUM(poin) as total_poin FROM soal WHERE ujian_id = ?`,
-            [ujian_id]
-        );
-        const total     = totalSoalRow[0].total;
-        const totalPoin = totalSoalRow[0].total_poin || total;
-
-        const benar  = jawaban.filter(j => j.is_benar === 1).length;
-        const salah  = jawaban.filter(j => j.is_benar === 0).length;
-        const kosong = total - (benar + salah);
-        const nilai  = totalPoin > 0 ? Math.round((benar / total) * 100) : 0;
-
-        await pool.query(
-            `INSERT INTO nilai_ujian (siswa_id, ujian_id, nilai, benar, salah, kosong, selesai_pada)
-             VALUES (?, ?, ?, ?, ?, ?, NOW())
-             ON DUPLICATE KEY UPDATE
-               nilai        = VALUES(nilai),
-               benar        = VALUES(benar),
-               salah        = VALUES(salah),
-               kosong       = VALUES(kosong),
-               selesai_pada = NOW()`,
-            [siswa_id, ujian_id, nilai, benar, salah, kosong]
-        );
-
-        // FIX #11 — Hapus seed dari map karena ujian sudah selesai
-        seedMap.delete(`${siswa_id}_${ujian_id}`);
-
-        res.json({ nilai, benar, salah, kosong });
-
+        const { finalizeSesi } = require('../services/finalizeService');
+        const hasil = await finalizeSesi(siswa_id, ujian_id, pool);
+        res.json(hasil);
     } catch (err) {
         console.error('POST /selesai-ujian error:', err);
         res.status(500).json({ error: 'Gagal simpan nilai' });
@@ -427,16 +602,12 @@ router.get('/cek-status-ujian', async (req, res) => {
             return res.json({ valid: false, reason: 'keluar_paksa' });
         }
 
-        const [countRow] = await pool.query(
-            `SELECT COUNT(*) AS jumlah FROM log_kecurangan WHERE siswa_id = ? AND ujian_id = ?`,
-            [siswa_id, ujian_id]
-        );
         const [ujianRow] = await pool.query(
             `SELECT batas_pelanggaran FROM ujian WHERE id = ?`,
             [ujian_id]
         );
         const batas  = ujianRow[0]?.batas_pelanggaran || 3;
-        const jumlah = countRow[0].jumlah;
+        const jumlah = await require('../services/sesiService').hitungPelanggaran(siswa_id, ujian_id, pool);
 
         res.json({
             valid:               true,

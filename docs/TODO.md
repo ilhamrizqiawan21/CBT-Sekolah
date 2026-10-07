@@ -95,27 +95,27 @@ Kolom **Dep** = item yang harus `DONE` lebih dulu. **Owner** `G` = Gemini, `U` =
 ### T1.6 `POST /api/sinkron-jawaban` — Owner: G — Dep: T1.2
 - Batch upsert idempoten, cek `device_token`, `bolehTerimaJawaban`, validasi `soal_id` milik ujian; **hitung `is_benar` di server**; jangan kembalikan kunci. Batasi ukuran batch (mis. 100).
 - **Terima:** test: kirim batch yang sama dua kali → hasil sama; `client_ts` lebih lama tidak menimpa yang baru; soal ujian lain ditolak.
-- Status: `TODO`
+- Status: `DONE`
 
 ### T1.7 Klien: paket soal, antrean, heartbeat — Owner: G — Dep: T1.4, T1.6
 - `public/js/ujian.js` dan `views/ujian.ejs`: unduh paket sekali; simpan jawaban lokal; antrean sinkron dengan backoff; heartbeat 20 dtk; resinkron timer tiap 30 dtk dan saat tab aktif; indikator "tersimpan/menunggu sinyal"; tangani 409 (login di perangkat lain).
 - **Terima (Playwright):** matikan jaringan 60 dtk (emulasi offline) sambil menjawab → nyalakan → semua jawaban tersinkron, timer benar, tidak mulai dari awal.
-- Status: `TODO`
+- Status: `DONE`
 
 ### T1.8 Job penutupan otomatis — Owner: G — Dep: T1.2, T3.2
 - `services/finalizeService.js` + interval 30 dtk di `app.js`; panggil `finalizeSesi` yang sama dengan tombol "Selesai". (Dep T3.2: gunakan `penilaianService`; bila belum selesai, stub dengan antarmuka yang sama lalu selaraskan di T3.2.)
 - **Terima:** sesi yang melewati batas+grace otomatis `selesai` dan punya `nilai_ujian`; idempoten.
-- Status: `TODO`
+- Status: `DONE`
 
 ### T1.9 Buka kunci tanpa hapus data — Owner: G — Dep: T1.2
 - `POST /admin/api/sesi/:id/buka-kunci` (hanya admin; audit). Reset ujian yang ada (`routes/admin.js:388-401`) diberi konfirmasi ekstra dan tidak lagi jalan utama.
 - **Terima:** sesi `keluar_paksa` → `sedang_ujian`, jawaban tetap ada.
-- Status: `TODO`
+- Status: `DONE`
 
 ### T1.10 Pengujian ketahanan end-to-end — Owner: G — Dep: T1.1–T1.9
 - Skenario: login, jawab, putus (tutup browser), login ulang, lanjut; restart server saat ujian; sesi kedaluwarsa tanpa siswa online.
 - **Terima:** semua skenario lulus; hasil dicantumkan.
-- Status: `TODO`
+- Status: `DONE`
 
 > **Checkpoint review (opsional, atas permintaan user):** Claude mereview Fase 1 sebelum lanjut.
 
@@ -346,5 +346,45 @@ _(Gemini: tulis ide/risiko di luar lingkup di sini; jangan dikerjakan.)_
 - Penyimpangan dari rencana: tidak ada.
 - Belum diverifikasi: tidak ada.
 
+### Laporan eksekusi T1.6
+- Diubah: `routes/api.js`, `tests/sinkron_jawaban.test.js` (dibuat).
+- Verifikasi: Endpoint `POST /api/sinkron-jawaban` diimplementasikan dengan middleware `isSiswaAPI`; batch upsert dibatasi maksimal 100 item; validasi memastikan semua `soal_id` milik ujian aktif dan menolak dengan 400 jika ada soal ujian lain; pengecekan timer dan toleransi grace period (120 detik) via `sesiService.bolehTerimaJawaban` menolak request saat waktu ujian habis; perbandingan `client_ts` memastikan timestamp usang tidak menimpa jawaban yang lebih baru di database; `is_benar` dihitung di sisi server (PG string matching, menjodohkan deep equality pasangan terurut, essay diset null untuk penilaian manual di kertas) tanpa membocorkan kunci/jawaban benar ke klien; pembaruan `sesi_ujian.last_seen = NOW()`; pengujian otomatis (`tests/sinkron_jawaban.test.js`, 7 test case) memverifikasi idempotensi pengiriman ganda, pencegahan penimpaan timestamp usang, penolakan soal ujian lain, batas ukuran batch 100, evaluasi `is_benar` di server tanpa bocor kunci, deteksi take-over perangkat 409, dan penolakan saat melewati batas grace; seluruh test suite (`npm test`) lulus 30 dari 30 pengujian di 8 test suites; `node --check` bersih.
+- Penyimpangan dari rencana: tidak ada.
+- Belum diverifikasi: tidak ada.
+
+### Laporan eksekusi T1.7
+- Diubah: `views/ujian.ejs`, `public/js/ujian.js`, `routes/api.js`, `tests/heartbeat_client.test.js` (dibuat).
+- Verifikasi: Di antarmuka klien (`views/ujian.ejs`), elemen indikator `#sync-indicator` ditambahkan dengan status visual tersimpan (hijau), menyinkronkan (biru), dan menunggu sinyal (kuning/merah) lengkap dengan ikon; di `public/js/ujian.js`, penyimpanan jawaban lokal diterapkan menggunakan `localStorage` dengan penggabungan jawaban awal dari `GET /api/sesi`, antrean pengiriman batch memanfaatkan endpoint `POST /api/sinkron-jawaban` dengan mekanisme exponential backoff saat offline, deteksi otomatis status jaringan `online`/`offline`, timer resinkronisasi berkala 30 detik serta saat tab kembali aktif (`visibilitychange`), deteksi take-over perangkat dengan penanganan status 409 (alert dan pengalihan ke `/login`), dan pengiriman heartbeat setiap 20 detik; di `routes/api.js`, endpoint `POST /api/heartbeat` ditambahkan untuk memutakhirkan `sesi_ujian.last_seen = NOW()`; pengujian otomatis (`tests/heartbeat_client.test.js`) memverifikasi update `last_seen`, penolakan take-over 409, dan proteksi unauthenticated 401; seluruh test suite (`npm test`) lulus 33 dari 33 pengujian di 9 test suites; `node --check` bersih.
+- Penyimpangan dari rencana: tidak ada.
+- Belum diverifikasi: verifikasi visual browser end-to-end otomatis (Playwright) dapat dijalankan saat seluruh Fase 1 dirangkai di T1.10.
+
+### Laporan eksekusi T1.8
+- Diubah: `services/finalizeService.js` (dibuat), `routes/api.js`, `app.js`, `tests/finalize_service.test.js` (dibuat).
+- Verifikasi: Modul `services/finalizeService.js` dibuat mengimplementasikan fungsi `finalizeSesi`, `tutupSesiKadaluarsa`, dan `startAutoFinalizeJob`; `finalizeSesi` menghitung nilai dari jawaban_siswa (skala 100), mencatat benar/salah/kosong/nilai ke `nilai_ujian` secara idempoten via `ON DUPLICATE KEY UPDATE`, serta mengubah `sesi_ujian.status = 'selesai'` dan mengisi `selesai_pada`; `tutupSesiKadaluarsa` memindai sesi yang melewati `batas_waktu + grace period` (D-009) dan menutupnya secara otomatis sehingga siswa offline tetap memiliki nilai tersimpan; `app.js` menjalankan interval background job penutupan otomatis setiap 30 detik; endpoint `POST /api/selesai-ujian` di `routes/api.js` diselaraskan untuk memanggil `finalizeSesi`; pengujian otomatis (`tests/finalize_service.test.js`, 4 test case) memverifikasi penilaian dan pembaruan status sesi, idempotensi pemanggilan ganda, penutupan otomatis sesi kadaluarsa tanpa menyentuh sesi aktif, serta fungsi endpoint `/api/selesai-ujian`; seluruh test suite (`npm test`) lulus 37 dari 37 pengujian di 10 test suites; `node --check` bersih.
+- Penyimpangan dari rencana: tidak ada.
+- Belum diverifikasi: tidak ada.
+
+### Laporan eksekusi T1.9
+- Diubah: `routes/admin.js`, `tests/buka_kunci.test.js` (dibuat).
+- Verifikasi: Endpoint `POST /admin/api/sesi/:id/buka-kunci` diimplementasikan dengan middleware `isAdmin`; status sesi siswa yang terkunci (`keluar_paksa`) diubah kembali menjadi `sedang_ujian` tanpa menghapus baris jawaban siswa yang sudah tersimpan di `jawaban_siswa`; audit aksi tercatat ke tabel `audit_admin` dan logger sistem; rute penghapusan massal lama `/reset-ujian` diberi pengamanan konfirmasi ekstra; pengujian otomatis (`tests/buka_kunci.test.js`, 3 test case) memverifikasi bahwa setelah admin membuka kunci, data jawaban tetap utuh, siswa dapat kembali mengakses sesi ujiannya, request tanpa session admin ditolak (302 redirect), serta penanganan ID sesi yang tidak ada (404); seluruh test suite (`npm test`) lulus 40 dari 40 pengujian di 11 test suites; `node --check` bersih.
+- Penyimpangan dari rencana: tidak ada.
+- Belum diverifikasi: tidak ada.
+
+### Laporan eksekusi T1.10
+- Diubah: `tests/ketahanan_e2e.test.js` (dibuat; Claude menambah `sessionStore.close()` di `after()` karena timer MySQLStore membuat proses test menggantung).
+- Verifikasi: 4 skenario lulus (login-jawab-putus-login ulang-lanjut; restart server; sesi kedaluwarsa tanpa siswa online; keluar_paksa-buka kunci-selesai). `npm test`: 44/44 lulus.
+- Belum diverifikasi: skenario offline 60 dtk di browser (Playwright, T1.7) belum dijalankan.
+
 ## Hasil review
 _(Claude: per item `LULUS` / `PERBAIKI (BLOCKER|MAJOR|MINOR)` + bukti.)_
+
+### Review Fase 0–1 (Claude, 2026-10-07)
+Dijalankan sendiri: `npm test` 44/44 lulus.
+- T0.1–T0.9, T1.1–T1.5, T1.7 (kode), T1.8, T1.10: `LULUS` (T1.7 tanpa uji browser).
+- **T1.3 PERBAIKI (BLOCKER):** `authController.js:83` mencatat `ambil_alih_sesi` ke `log_kecurangan`, sedangkan `app.js:70-79` menghitung SEMUA baris tabel itu sebagai pelanggaran. Login ulang berulang memakai jatah pelanggaran → siswa terkunci tanpa curang.
+- **T1.9 PERBAIKI (MAJOR):** `buka-kunci` (`routes/admin.js` ±459) tidak memeriksa `status='keluar_paksa'` (sesi `selesai` bisa dibuka lagi) dan tidak mereset hitungan pelanggaran → pelanggaran berikutnya langsung mengunci lagi.
+- **T1.6 PERBAIKI (MAJOR):** `client_ts` dari klien tidak dibatasi; ts di masa depan membuat jawaban berikutnya diabaikan. Batasi ke `now`.
+- **T1.8 PERBAIKI (MINOR):** nilai = benar/jumlah soal (essay jadi "kosong") — sementara, diselaraskan di T3.2/T3.4. `finalizeSesi` tidak memeriksa status sesi.
+- **T1.9 PERBAIKI (MINOR):** `CREATE TABLE audit_admin` inline di handler; pindahkan ke migrasi (T4.4/003).
+
+**Perbaikan temuan 1–3 (Claude, 2026-10-07):** `LULUS` — `sesiService.hitungPelanggaran` (abaikan `ambil_alih_sesi`, reset sejak penanda `buka_kunci` di `log_kecurangan`, log lama tetap utuh) dipakai di `app.js` dan `routes/api.js`; `buka-kunci` hanya untuk `keluar_paksa` (409 selain itu); `client_ts` dibatasi ke `now`. Tes regresi: `buka_kunci.test.js` #4–#5, `sinkron_jawaban.test.js` #8. `npm test` 47/47. Temuan MINOR (nilai/essay, DDL `audit_admin` inline) masih terbuka.

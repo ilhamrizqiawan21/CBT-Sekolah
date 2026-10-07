@@ -1,45 +1,78 @@
 const ujianId = window.ujianId;
 const siswaId = window.siswaId;
-let waktuTersisa    = 0;
-let timerInterval   = null;
-let offlineQueue    = [];
-let totalSoal       = 0;
-let terjawab        = 0;
-let pollingInterval = null;
-// FIX #10 — flag untuk pastikan selesaiUjian hanya jalan sekali
-let ujianSudahSelesai = false;
+let waktuTersisa       = 0;
+let timerInterval      = null;
+let heartbeatInterval  = null;
+let resyncTimerInterval = null;
+let totalSoal          = 0;
+let terjawab           = 0;
+let pollingInterval    = null;
+let ujianSudahSelesai  = false;
 
 // ─────────────────────────────────────────────
-// FIX #2 — localStorage hanya simpan flag soal
-// yang sudah dijawab, bukan nilai jawaban.
-// Offline queue di sessionStorage (tab saja).
+// Storage Keys (DESIGN §3.3, T1.7)
+// Jawaban disimpan di localStorage per siswa+ujian
+// Antrean sinkronisasi disimpan di localStorage
 // ─────────────────────────────────────────────
-const KEY_ANSWERED = `answered_${siswaId}_${ujianId}`;
-const KEY_QUEUE    = `queue_${siswaId}_${ujianId}`;
+const KEY_LOCAL_ANSWERS = `answers_${siswaId}_${ujianId}`;
+const KEY_QUEUE         = `sync_queue_${siswaId}_${ujianId}`;
 
 const socket = io();
 
-function loadQueue() {
-    try { return JSON.parse(sessionStorage.getItem(KEY_QUEUE) || '[]'); }
+function getLocalAnswers() {
+    try { return JSON.parse(localStorage.getItem(KEY_LOCAL_ANSWERS) || '{}'); }
+    catch { return {}; }
+}
+function saveLocalAnswers(ans) {
+    try { localStorage.setItem(KEY_LOCAL_ANSWERS, JSON.stringify(ans)); } catch {}
+}
+
+function getSyncQueue() {
+    try { return JSON.parse(localStorage.getItem(KEY_QUEUE) || '[]'); }
     catch { return []; }
 }
-function saveQueue(q) {
-    try { sessionStorage.setItem(KEY_QUEUE, JSON.stringify(q)); } catch {}
+function saveSyncQueue(q) {
+    try { localStorage.setItem(KEY_QUEUE, JSON.stringify(q)); } catch {}
 }
-offlineQueue = loadQueue();
 
-function getAnsweredSet() {
-    try { return new Set(JSON.parse(localStorage.getItem(KEY_ANSWERED) || '[]')); }
-    catch { return new Set(); }
-}
-function saveAnsweredSet(set) {
-    try { localStorage.setItem(KEY_ANSWERED, JSON.stringify([...set])); } catch {}
-}
-function markAnswered(soal_id) {
-    const s = getAnsweredSet(); s.add(String(soal_id)); saveAnsweredSet(s);
-}
 function isAnswered(soal_id) {
-    return getAnsweredSet().has(String(soal_id));
+    const local = getLocalAnswers();
+    return local[soal_id] !== undefined && local[soal_id] !== null && String(local[soal_id]).trim() !== '';
+}
+
+// ── Indikator Sinkronisasi (T1.7) ──
+function updateSyncIndicator(status, message = null) {
+    const el = document.getElementById('sync-indicator');
+    const txt = document.getElementById('sync-indicator-txt');
+    const icon = document.getElementById('sync-icon');
+    if (!el || !txt) return;
+
+    el.classList.remove('sync-saved', 'sync-saving', 'sync-offline');
+    if (status === 'saving') {
+        el.classList.add('sync-saving');
+        txt.textContent = message || 'Menyimpan...';
+        if (icon) icon.className = 'bi bi-cloud-arrow-up-fill';
+    } else if (status === 'offline') {
+        el.classList.add('sync-offline');
+        txt.textContent = message || 'Menunggu sinyal';
+        if (icon) icon.className = 'bi bi-cloud-slash-fill';
+    } else {
+        el.classList.add('sync-saved');
+        txt.textContent = message || 'Tersimpan';
+        if (icon) icon.className = 'bi bi-cloud-check-fill';
+    }
+}
+
+// ── Penanganan Pengambilalihan Perangkat (Take-over 409) ──
+function handleTakeover() {
+    if (ujianSudahSelesai) return;
+    ujianSudahSelesai = true;
+    if (timerInterval) clearInterval(timerInterval);
+    if (heartbeatInterval) clearInterval(heartbeatInterval);
+    if (resyncTimerInterval) clearInterval(resyncTimerInterval);
+    stopPolling();
+    alert('⚠️ Sesi ujian Anda telah diambil alih di perangkat/tab lain.\nHalaman ini akan dialihkan ke halaman login.');
+    window.location.href = '/login';
 }
 
 // ── Progress bar ──
@@ -50,7 +83,8 @@ function updateProgress() {
     }
 }
 function hitungTerjawab() {
-    terjawab = getAnsweredSet().size;
+    const local = getLocalAnswers();
+    terjawab = Object.keys(local).filter(k => isAnswered(k)).length;
     updateProgress();
     updateNavGrid();
 }
@@ -80,47 +114,167 @@ function buildNavGrid(soalList) {
     });
 }
 
-// ── Simpan jawaban ──
+// ── Antrean Sinkron Jawaban Batch dengan Exponential Backoff (T1.6, T1.7) ──
+let isSyncing = false;
+let backoffDelay = 2000;
+let retryTimeout = null;
+
 async function simpanJawaban(soal_id, jawaban) {
-    markAnswered(soal_id);
+    const sid = parseInt(soal_id, 10);
+
+    // 1. Simpan segera ke localStorage lokal
+    const local = getLocalAnswers();
+    local[sid] = jawaban;
+    saveLocalAnswers(local);
+
+    // 2. Perbarui progres antarmuka
     hitungTerjawab();
-    offlineQueue.push({ soal_id, jawaban });
-    saveQueue(offlineQueue);
+
+    // 3. Masukkan ke antrean sinkronisasi
+    const queue = getSyncQueue();
+    const existingIdx = queue.findIndex(q => q.soal_id === sid);
+    const item = {
+        soal_id: sid,
+        jawaban: jawaban,
+        client_ts: new Date().toISOString()
+    };
+    if (existingIdx >= 0) {
+        queue[existingIdx] = item;
+    } else {
+        queue.push(item);
+    }
+    saveSyncQueue(queue);
+
+    // 4. Picu sinkronisasi
     await kirimAntrian();
 }
 
 async function kirimAntrian() {
-    if (!offlineQueue.length) return;
-    const copy = [...offlineQueue];
-    for (const item of copy) {
-        try {
-            const res = await fetch('/api/simpan-jawaban', {
-                method:      'POST',
-                headers:     { 'Content-Type': 'application/json' },
-                body:        JSON.stringify({ ujian_id: ujianId, soal_id: item.soal_id, jawaban: item.jawaban }),
-                credentials: 'same-origin'
-            });
-            if (res.ok) {
-                offlineQueue = offlineQueue.filter(
-                    q => !(q.soal_id === item.soal_id && q.jawaban === item.jawaban)
-                );
-                saveQueue(offlineQueue);
+    if (isSyncing) return;
+    const queue = getSyncQueue();
+    if (!queue.length) {
+        updateSyncIndicator('saved');
+        return;
+    }
+
+    if (!navigator.onLine) {
+        updateSyncIndicator('offline', 'Offline');
+        return;
+    }
+
+    isSyncing = true;
+    updateSyncIndicator('saving');
+
+    // Kirim batch hingga 100 item (batas ukuran batch)
+    const batch = queue.slice(0, 100);
+
+    try {
+        const res = await fetch('/api/sinkron-jawaban', {
+            method:      'POST',
+            headers:     { 'Content-Type': 'application/json' },
+            body:        JSON.stringify({ jawaban: batch }),
+            credentials: 'same-origin'
+        });
+
+        if (res.status === 409) {
+            isSyncing = false;
+            handleTakeover();
+            return;
+        }
+
+        if (res.status === 401) {
+            window.location.href = '/login';
+            return;
+        }
+
+        if (res.ok) {
+            // Berhasil: hapus item yang terkirim dari antrean
+            const currentQueue = getSyncQueue();
+            const remaining = currentQueue.slice(batch.length);
+            saveSyncQueue(remaining);
+
+            backoffDelay = 2000; // Reset delay jika sukses
+            isSyncing = false;
+
+            if (remaining.length > 0) {
+                // Masih ada sisa antrean, lanjutkan segera
+                kirimAntrian();
+            } else {
+                updateSyncIndicator('saved');
             }
-        } catch { break; }
+        } else {
+            throw new Error(`HTTP ${res.status}`);
+        }
+    } catch (err) {
+        isSyncing = false;
+        updateSyncIndicator('offline', 'Menunggu sinyal');
+
+        // Backoff eksponensial untuk retry
+        if (retryTimeout) clearTimeout(retryTimeout);
+        retryTimeout = setTimeout(() => {
+            kirimAntrian();
+        }, backoffDelay);
+        backoffDelay = Math.min(backoffDelay * 2, 30000);
     }
 }
-setInterval(() => { if (navigator.onLine) kirimAntrian(); }, 30000);
-window.addEventListener('online', () => kirimAntrian());
 
-// ─────────────────────────────────────────────
-// FIX #4 — Polling server-side sebagai fallback
-// Setiap 15 detik cek status ujian ke server
-// tanpa bergantung pada socket.
-// ─────────────────────────────────────────────
+// ── Heartbeat 20 Detik (T1.7, DESIGN §3.3) ──
+function startHeartbeat() {
+    if (heartbeatInterval) clearInterval(heartbeatInterval);
+    heartbeatInterval = setInterval(async () => {
+        if (!navigator.onLine || ujianSudahSelesai) return;
+        try {
+            const res = await fetch('/api/heartbeat', {
+                method:      'POST',
+                credentials: 'same-origin'
+            });
+            if (res.status === 409) {
+                handleTakeover();
+            }
+        } catch (_) {}
+    }, 20000);
+}
+
+// ── Resinkron Timer Tiap 30 Detik (T1.7) ──
+async function resinkronTimer() {
+    if (!navigator.onLine || ujianSudahSelesai) return;
+    try {
+        const res = await fetch('/api/sesi', { credentials: 'same-origin' });
+        if (res.status === 409) {
+            handleTakeover();
+            return;
+        }
+        if (res.ok) {
+            const data = await res.json();
+            if (data.sisa_detik !== undefined) {
+                waktuTersisa = parseInt(data.sisa_detik, 10);
+            }
+        }
+    } catch (_) {}
+}
+
+function startResyncTimer() {
+    if (resyncTimerInterval) clearInterval(resyncTimerInterval);
+    resyncTimerInterval = setInterval(resinkronTimer, 30000);
+}
+
+// ── Event Jaringan Klien ──
+window.addEventListener('online', () => {
+    updateSyncIndicator('saving', 'Tersambung, menyinkron...');
+    backoffDelay = 2000;
+    kirimAntrian();
+    resinkronTimer();
+});
+window.addEventListener('offline', () => {
+    updateSyncIndicator('offline', 'Koneksi terputus');
+});
+
+// ── Polling Status Ujian Fallback Server-Side ──
 async function cekStatusUjianDariServer() {
     try {
         const res = await fetch('/api/cek-status-ujian', { credentials: 'same-origin' });
         if (res.status === 401) { window.location.href = '/login'; return; }
+        if (res.status === 409) { handleTakeover(); return; }
         const data = await res.json();
         if (!data.valid) {
             stopPolling();
@@ -134,7 +288,7 @@ async function cekStatusUjianDariServer() {
                 window.location.href = '/login';
             }
         }
-    } catch { /* jaringan putus sementara, coba lagi */ }
+    } catch { /* offline / retry */ }
 }
 function startPolling() {
     if (pollingInterval) return;
@@ -147,19 +301,53 @@ function stopPolling() {
     if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
 }
 
-// ── Load soal ──
+// ── Unduh Paket Soal (DESIGN §3.3) ──
 async function loadSoal() {
     try {
+        // 1. Ambil data sesi terlebih dahulu untuk memuat sisa waktu & jawaban tersimpan di server
+        try {
+            const sesiRes = await fetch('/api/sesi', { credentials: 'same-origin' });
+            if (sesiRes.status === 409) {
+                handleTakeover();
+                return;
+            }
+            if (sesiRes.ok) {
+                const sesiData = await sesiRes.json();
+                if (sesiData.jawaban_tersimpan) {
+                    const local = getLocalAnswers();
+                    for (const [sid, val] of Object.entries(sesiData.jawaban_tersimpan)) {
+                        if (local[sid] === undefined) {
+                            local[sid] = val;
+                        }
+                    }
+                    saveLocalAnswers(local);
+                }
+                if (sesiData.sisa_detik !== undefined) {
+                    waktuTersisa = parseInt(sesiData.sisa_detik, 10);
+                }
+            }
+        } catch (_) {}
+
+        // 2. Unduh paket butir soal
         const res = await fetch(`/api/soal/${ujianId}`, { credentials: 'same-origin' });
+        if (res.status === 409) {
+            handleTakeover();
+            return;
+        }
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const soal = await res.json();
         if (soal.error) throw new Error(soal.error);
+
         totalSoal = soal.length;
         hitungTerjawab();
         buildNavGrid(soal);
         renderSoal(soal);
+
+        // Jika ada antrean yang belum terkirim, kirim sekarang
+        kirimAntrian();
+
     } catch (err) {
-        console.error(err);
+        console.error('loadSoal error:', err);
         const c = document.getElementById('soal-container');
         if (c) c.innerHTML = `
             <div class="alert alert-danger text-center">
@@ -174,6 +362,8 @@ function renderSoal(soalList) {
     const container = document.getElementById('soal-container');
     if (!container) return;
     container.innerHTML = '';
+    const local = getLocalAnswers();
+
     soalList.forEach((soal, idx) => {
         const div = document.createElement('div');
         div.className = 'soal-card';
@@ -187,14 +377,17 @@ function renderSoal(soalList) {
             <div class="soal-text">${soal.teks_soal}</div>
         `;
 
+        const savedValue = local[soal.id];
+
         if (soal.tipe === 'pg') {
             html += `<div class="pilihan-ganda">`;
             soal.pilihan.forEach(p => {
+                const isChecked = savedValue === p.key ? 'checked' : '';
                 html += `
                     <div class="form-check" onclick="this.querySelector('input').click()">
                         <input class="form-check-input" type="radio"
                                name="soal_${soal.id}" value="${p.key}"
-                               id="q_${soal.id}_${p.key}">
+                               id="q_${soal.id}_${p.key}" ${isChecked}>
                         <label class="form-check-label" for="q_${soal.id}_${p.key}">
                             ${p.key}. ${p.text}
                         </label>
@@ -210,17 +403,25 @@ function renderSoal(soalList) {
                 <select class="form-select" name="soal_${soal.id}" id="select_${soal.id}">
                     <option value="">-- Pilih Jawaban --</option>`;
             (soal.pasangan || []).forEach(p => {
-                html += `<option value="${p.kanan}">${p.kiri} → ${p.kanan}</option>`;
+                const isSelected = savedValue === p.kanan ? 'selected' : '';
+                html += `<option value="${p.kanan}" ${isSelected}>${p.kiri} → ${p.kanan}</option>`;
             });
             (soal.pengecoh || []).forEach(p => {
-                html += `<option value="${p}">${p}</option>`;
+                const isSelected = savedValue === p ? 'selected' : '';
+                html += `<option value="${p}" ${isSelected}>${p}</option>`;
             });
             html += `</select></div>`;
         }
         else if (soal.tipe === 'essay') {
+            // FR-09, D-006: Essay dijawab di kertas
             html += `<div class="essay mb-3">
-                <textarea class="form-control" name="soal_${soal.id}"
-                          rows="4" placeholder="Tulis jawaban Anda di sini..."></textarea>
+                <div class="alert alert-light border d-flex align-items-center gap-2 mb-0">
+                    <i class="bi bi-journal-text text-primary fs-5"></i>
+                    <div>
+                        <strong class="d-block text-dark">Dijawab di Lembar Kertas</strong>
+                        <small class="text-muted">Tulis jawaban uraian Anda secara rapi pada lembar jawaban kertas yang disediakan pengawas.</small>
+                    </div>
+                </div>
             </div>`;
         }
 
@@ -234,18 +435,11 @@ function renderSoal(soalList) {
         } else if (soal.tipe === 'menjodohkan') {
             const sel = div.querySelector(`select[name="soal_${soal.id}"]`);
             sel.addEventListener('change', () => simpanJawaban(soal.id, sel.value));
-        } else if (soal.tipe === 'essay') {
-            const ta = div.querySelector(`textarea[name="soal_${soal.id}"]`);
-            let t;
-            ta.addEventListener('input', () => {
-                clearTimeout(t);
-                t = setTimeout(() => simpanJawaban(soal.id, ta.value), 500);
-            });
         }
     });
 }
 
-// ── Timer ──
+// ── Timer Server-Authoritative ──
 function startTimer(durasiMenit, sisaDetik) {
     if (timerInterval) clearInterval(timerInterval);
     if (sisaDetik !== undefined && sisaDetik !== null) {
@@ -309,62 +503,42 @@ function detectCopyPaste() {
 }
 detectCopyPaste();
 
-// ─────────────────────────────────────────────
-// FIX #10 — selesaiUjian() WAJIB panggil
-// /api/selesai-ujian terlebih dulu sebelum
-// emit socket 'selesai-ujian'.
-//
-// Sebelumnya siswa bisa:
-//   socket.emit('selesai-ujian')  ← dari console
-// tanpa memanggil API, sehingga nilai tidak
-// tersimpan dan bisa login ulang lagi.
-//
-// Sekarang:
-//   1. Kirim antrian jawaban yang belum terkirim
-//   2. Panggil POST /api/selesai-ujian (wajib berhasil)
-//   3. Baru emit socket 'selesai-ujian'
-//   4. Redirect ke /logout
-//
-// Flag ujianSudahSelesai mencegah double-call
-// jika timer habis bersamaan dengan klik tombol.
-// ─────────────────────────────────────────────
+// ── Selesai & Finalisasi Ujian ──
 async function selesaiUjian() {
-    // FIX #10 — Cegah eksekusi ganda
     if (ujianSudahSelesai) return;
     ujianSudahSelesai = true;
 
     if (timerInterval) clearInterval(timerInterval);
+    if (heartbeatInterval) clearInterval(heartbeatInterval);
+    if (resyncTimerInterval) clearInterval(resyncTimerInterval);
     stopPolling();
 
-    // Kunci tombol selesai agar tidak bisa diklik lagi
     const btnSelesai = document.getElementById('btn-selesai');
     if (btnSelesai) {
         btnSelesai.disabled = true;
         btnSelesai.textContent = 'Mengumpulkan jawaban...';
     }
 
-    // Kirim semua antrian yang belum terkirim
+    // Kirim seluruh sisa antrean yang belum terkirim
     await kirimAntrian();
 
     try {
-        // FIX #10 — API HARUS berhasil dulu sebelum emit socket
-        const res  = await fetch('/api/selesai-ujian', {
+        const res = await fetch('/api/selesai-ujian', {
             method:      'POST',
             credentials: 'same-origin'
         });
 
         if (!res.ok) {
-            // Jika server reject (misal waktu habis), tetap redirect
             const errData = await res.json().catch(() => ({}));
             console.warn('selesai-ujian API error:', errData.error);
         }
 
         const data = await res.json().catch(() => ({}));
 
-        // Bersihkan storage
-        sessionStorage.removeItem(KEY_QUEUE);
+        // Bersihkan data ujian ini dari storage
+        localStorage.removeItem(KEY_LOCAL_ANSWERS);
+        localStorage.removeItem(KEY_QUEUE);
 
-        // Tampilkan hasil jika ada
         if (data.nilai !== undefined) {
             alert(
                 `✅ Ujian selesai!\n\n` +
@@ -375,22 +549,17 @@ async function selesaiUjian() {
             );
         }
 
-        // FIX #10 — Emit socket SETELAH API berhasil
-        // Ini update status sesi_ujian ke 'selesai' di server
         socket.emit('selesai-ujian');
-
-        // Redirect ke logout
         window.location.href = '/logout';
 
     } catch (e) {
-        // Jika jaringan putus total, tetap emit socket dan redirect
         console.error('selesaiUjian fetch error:', e);
         socket.emit('selesai-ujian');
         window.location.href = '/logout';
     }
 }
 
-// ── Socket events ──
+// ── Socket Events ──
 socket.on('connect', () => {
     console.log('Socket connected:', socket.id);
     socket.emit('siswa-siap', { ujian_id: ujianId, siswa_id: siswaId });
@@ -401,6 +570,8 @@ socket.on('mulai-ujian', ({ durasi, sisa_detik }) => {
     startTimer(durasi, sisa_detik);
     loadSoal();
     startPolling();
+    startHeartbeat();
+    startResyncTimer();
 });
 
 socket.on('paksa-submit', () => {
@@ -418,14 +589,22 @@ socket.on('error', ({ message }) => {
 socket.on('reconnect', () => {
     console.log('Socket reconnected');
     cekStatusUjianDariServer();
+    resinkronTimer();
+    kirimAntrian();
 });
 
-// ── Deteksi pindah tab ──
+// ── Deteksi Pindah Tab & Resinkron Timer saat Tab Aktif (T1.7) ──
 document.addEventListener('visibilitychange', () => {
-    if (document.hidden) socket.emit('pindah-tab');
+    if (document.hidden) {
+        socket.emit('pindah-tab');
+    } else {
+        // Tab aktif kembali: resinkron timer dan flush antrean jawaban
+        resinkronTimer();
+        kirimAntrian();
+    }
 });
 
-// ── Tombol selesai manual ──
+// ── Tombol Selesai Manual ──
 const btnSelesai = document.getElementById('btn-selesai');
 if (btnSelesai) {
     btnSelesai.addEventListener('click', () => {
@@ -435,7 +614,7 @@ if (btnSelesai) {
     });
 }
 
-// ── Cegah refresh tanpa sengaja ──
+// ── Cegah Refresh Tanpa Sengaja ──
 window.addEventListener('beforeunload', (e) => {
     if (timerInterval && waktuTersisa > 0 && !ujianSudahSelesai) {
         e.preventDefault();

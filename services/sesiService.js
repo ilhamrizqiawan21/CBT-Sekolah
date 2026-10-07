@@ -211,8 +211,29 @@ async function mulaiAtauLanjut(siswaId, ujianId, deviceType = null, db = default
     };
 }
 
+/**
+ * Menghitung jumlah pelanggaran yang berlaku untuk batas keluar_paksa.
+ * Hanya jenis pelanggaran sungguhan; 'ambil_alih_sesi' tidak dihitung.
+ * Pelanggaran sebelum penanda 'buka_kunci' terakhir (admin) tidak dihitung lagi.
+ */
+async function hitungPelanggaran(siswaId, ujianId, db = defaultPool) {
+    const [rows] = await db.query(
+        `SELECT COUNT(*) AS jumlah
+         FROM log_kecurangan
+         WHERE siswa_id = ? AND ujian_id = ?
+           AND jenis_kecurangan IN ('pindah_tab', 'keluar_fullscreen', 'copy_paste')
+           AND id > COALESCE((
+               SELECT MAX(id) FROM log_kecurangan
+               WHERE siswa_id = ? AND ujian_id = ? AND jenis_kecurangan = 'buka_kunci'
+           ), 0)`,
+        [siswaId, ujianId, siswaId, ujianId]
+    );
+    return rows[0].jumlah;
+}
+
 module.exports = {
     DEFAULT_GRACE_DETIK,
+    hitungPelanggaran,
     hitungBatasWaktu,
     hitungSisaDetik,
     bolehTerimaJawaban,
