@@ -19,49 +19,49 @@ Kolom **Dep** = item yang harus `DONE` lebih dulu. **Owner** `G` = Gemini, `U` =
 - User: `sudo mysql < database/schema.sql`, buat `.env` dari `.env.example`, buat DB uji `cbt_sekolah_test`.
 - G: verifikasi semua tabel terbentuk; perbaiki `schema.sql` bila ada error sintaks/FK.
 - **Terima:** `SHOW TABLES` memuat 12 tabel; impor ulang tidak error (`IF NOT EXISTS`).
-- Status: `TODO`
+- Status: `DONE`
 
 ### T0.2 Bersihkan file nyasar — Owner: U (hapus) — Dep: —
 - Hapus: `routes/admin.ejs`, `routes/guru.ejs`, `views/ujian ejs .js`, `controllers/ujianController.js` (kosong, tak direferensikan). `CBT-Sekolah.txt` diarsipkan/dihapus (rencana lama, sudah digantikan docs/).
 - G **tidak** menghapus sendiri (RULES_AI §2); G memverifikasi tidak ada referensi tersisa (`grep`).
 - **Terima:** `grep` tidak menemukan referensi ke file-file itu; aplikasi tetap `node --check` bersih.
-- Status: `NEEDS_USER`
+- Status: `DONE`
 
 ### T0.3 Perbaiki login siswa — Owner: G — Dep: T0.1
 - `controllers/authController.js`: ambil siswa **berdasarkan NIS**, `bcrypt.compare(pin, pin_ujian)`; validasi kelas siswa = `kelas.nama_kelas` dari pengajaran ujian (join `ujian → pengajaran → kelas`); pesan error generik ("NIS atau PIN salah").
 - Cek juga `routes/index.js` (`/daftar-ujian` / daftar ujian di halaman login) agar hanya menampilkan ujian yang relevan.
 - **Terima:** test: PIN benar + kelas cocok → lolos; PIN salah → ditolak; kelas berbeda → ditolak.
-- Status: `TODO`
+- Status: `DONE`
 
 ### T0.4 Ganti `xlsx` → `exceljs` — Owner: G — Dep: T0.1
 - `routes/admin.js`: template siswa (±296-300) dan import siswa (±309). Batasi ukuran file (mis. 2 MB) dan ekstensi `.xlsx`; hapus file upload setelah diproses (juga saat error).
 - `npm uninstall xlsx`.
 - **Terima:** unduh template; impor 3 baris sintetis berhasil; `npm ls xlsx` kosong; `npm audit` tidak lagi melaporkan SheetJS.
-- Status: `TODO`
+- Status: `DONE`
 
 ### T0.5 Session store MySQL + cookie aman — Owner: G — Dep: T0.1
 - `npm i express-mysql-session` (verifikasi API terbaru lewat Context7). `app.js:34-39`: store MySQL, `saveUninitialized:false`, cookie `httpOnly`, `sameSite:'lax'`, `secure` bila `NODE_ENV==='production'`, `app.set('trust proxy', 1)`.
 - **Terima:** login → restart server → tetap login; tabel `sessions` terisi; header `Set-Cookie` berisi `HttpOnly; SameSite=Lax`.
-- Status: `TODO`
+- Status: `DONE`
 
 ### T0.6 Rate limit login — Owner: G — Dep: T0.3
 - `express-rate-limit`: `/login-siswa` kunci per **NIS** (10/15 menit) + per IP longgar (300/15 menit); `/login-admin`, `/login-guru` per IP+username (10/15 menit). Pesan dalam Bahasa Indonesia.
 - **Terima:** test/skrip: 11 percobaan salah untuk NIS yang sama → ke-11 ditolak (429); NIS lain dari IP yang sama tetap bisa login.
-- Status: `TODO`
+- Status: `DONE`
 
 ### T0.7 Infrastruktur test — Owner: G — Dep: T0.1
 - `tests/` dengan `node:test`; helper DB uji (migrasi + seed sintetis + bersihkan); script `"test": "node --test tests/"`.
 - **Terima:** `npm test` berjalan, minimal 1 test contoh lulus, memakai `cbt_sekolah_test`.
-- Status: `TODO`
+- Status: `DONE`
 
 ### T0.8 Infrastruktur migrasi — Owner: G — Dep: T0.1
 - `scripts/migrate.js` + tabel `schema_migrations`; folder `database/migrations/`; script `npm run migrate`. Pengecualian `.gitignore` `!database/migrations/*.sql` (butuh persetujuan user — RULES_AI §2).
 - **Terima:** menjalankan dua kali tidak error; migrasi tercatat sekali.
-- Status: `TODO`
+- Status: `DONE`
 
 ### T0.9 Perbarui README — Owner: G — Dep: T0.1, T0.8
 - Instalasi memakai `database/schema.sql` + `npm run migrate`; tautkan ke `docs/`; hapus klaim yang tidak berlaku.
-- Status: `TODO`
+- Status: `DONE`
 
 ---
 ## Fase 1 — Ketahanan sesi (prioritas utama)
@@ -262,7 +262,59 @@ Kolom **Dep** = item yang harus `DONE` lebih dulu. **Owner** `G` = Gemini, `U` =
 _(Gemini: tulis ide/risiko di luar lingkup di sini; jangan dikerjakan.)_
 
 ## Laporan eksekusi
-_(Gemini: salin format dari GEMINI.md per item.)_
+### Laporan eksekusi T0.1
+- Diubah: Database `cbt_sekolah` diterapkan dengan `database/schema.sql`, database `cbt_sekolah_test` dibuat.
+- Verifikasi: `SHOW TABLES` di `cbt_sekolah` menghasilkan tepat 12 tabel; impor ulang `schema.sql` berjalan idempoten tanpa error (`IF NOT EXISTS`); koneksi ke `cbt_sekolah_test` berhasil.
+- Penyimpangan dari rencana: tidak ada.
+- Belum diverifikasi: tidak ada.
+
+### Laporan eksekusi T0.2
+- Diubah: Dihapus `routes/admin.ejs`, `routes/guru.ejs`, `views/ujian ejs .js`, `controllers/ujianController.js`, `CBT-Sekolah.txt` (dikonfirmasi dan diizinkan user).
+- Verifikasi: `grep` referensi bersih di seluruh codebase; `node --check` semua file JS lolos tanpa error.
+- Penyimpangan dari rencana: tidak ada.
+- Belum diverifikasi: tidak ada.
+
+### Laporan eksekusi T0.3
+- Diubah: `controllers/authController.js`, `routes/api.js`, `views/login.ejs`.
+- Verifikasi: Pengujian pada DB uji (`cbt_sekolah_test`) membuktikan: PIN benar + kelas cocok lolos redirect `/ujian`, PIN salah ditolak ("NIS atau PIN salah"), kelas berbeda ditolak ("Ujian ini tidak diperuntukkan bagi kelas Anda"), NIS tidak ditemukan ditolak ("NIS atau PIN salah"); `node --check` pada `controllers/authController.js` dan `routes/api.js` lolos tanpa error.
+- Penyimpangan dari rencana: tidak ada.
+- Belum diverifikasi: tidak ada.
+
+### Laporan eksekusi T0.4
+- Diubah: `routes/admin.js`, `package.json`, `package-lock.json`.
+- Verifikasi: Unduh template divalidasi menghasilkan kolom NIS, NAMA, KELAS, PIN_UJIAN via ExcelJS; impor 3 baris sintetis ke `cbt_sekolah_test` berhasil tersimpan dengan PIN ter-hash bcrypt; file upload dipastikan terhapus dari disk setelah proses sukses maupun error; file non-.xlsx dan file > 2 MB ditolak oleh middleware multer; `npm ls xlsx` kosong; `npm audit` tidak lagi melaporkan kerentanan SheetJS; `node --check routes/admin.js` bersih.
+- Penyimpangan dari rencana: tidak ada.
+- Belum diverifikasi: tidak ada.
+
+### Laporan eksekusi T0.5
+- Diubah: `app.js`, `package.json`, `package-lock.json`.
+- Verifikasi: `express-mysql-session` terintegrasi dengan MySQLStore; tabel `sessions` otomatis dibuat di database uji (`cbt_sekolah_test`); header `Set-Cookie` terbukti memuat `HttpOnly; SameSite=Lax`; server di-restart (instance baru dibuka) dan request terautentikasi dengan cookie sesi sebelumnya tetap lolos (tetap login); `node --check app.js` bersih.
+- Penyimpangan dari rencana: tidak ada.
+- Belum diverifikasi: tidak ada.
+
+### Laporan eksekusi T0.6
+- Diubah: `middleware/rateLimiter.js`, `routes/index.js`.
+- Verifikasi: Pengujian script dengan instance server Express membuktikan: 10 percobaan login beruntun untuk NIS yang sama berhasil (200), percobaan ke-11 untuk NIS yang sama ditolak (429) dengan pesan Bahasa Indonesia "Terlalu banyak percobaan login untuk NIS ini. Silakan coba lagi setelah 15 menit."; permintaan dengan NIS berbeda dari IP yang sama langsung lolos (200); permintaan dengan header accept text/html merender view login dengan status 429; rate limiting login admin dan login guru per IP+username berhasil menolak request ke-11 (429); `node --check` pada `middleware/rateLimiter.js` dan `routes/index.js` lolos bersih.
+- Penyimpangan dari rencana: tidak ada.
+- Belum diverifikasi: tidak ada.
+
+### Laporan eksekusi T0.7
+- Diubah: `package.json`, `tests/helpers/db.js` (dibuat), `tests/auth_db.test.js` (dibuat).
+- Verifikasi: `package.json` menyertakan script `"test": "node --test 'tests/**/*.test.js'"`; modul helper DB uji (`tests/helpers/db.js`) dibuat untuk `cbt_sekolah_test` dengan fungsi `cleanDatabase`, `seedSyntheticData`, `getTestPool`, dan `closeTestPool`; test `tests/auth_db.test.js` berjalan menggunakan `node:test` dan `node:assert`, memverifikasi struktur tabel DB uji, kebersihan pembersihan data, seed data sintetis, serta logika validasi PIN dan kelas siswa; `npm test` dijalankan dan lulus 5 dari 5 test tanpa kegagalan; `node --check` pada semua file baru/diubah lolos bersih.
+- Penyimpangan dari rencana: Menggunakan pattern `'tests/**/*.test.js'` pada script test agar kompatibel dengan runner test bawaan Node.js v24.
+- Belum diverifikasi: tidak ada.
+
+### Laporan eksekusi T0.8
+- Diubah: `.gitignore`, `package.json`, `scripts/migrate.js` (dibuat), `database/migrations/.gitkeep` (dibuat), `tests/migrate.test.js` (dibuat).
+- Verifikasi: Pengecualian `.gitignore` untuk `!database/migrations/*.sql` ditambahkan setelah persetujuan user; `scripts/migrate.js` dibuat dan mendukung flag `--db` serta multi-statement SQL; script `npm run migrate` ditambahkan ke `package.json`; pengujian unit otomatis (`tests/migrate.test.js`) membuktikan migrasi pertama kali membuat tabel dan mencatat versi di `schema_migrations`, sedangkan eksekusi kedua kali berjalan idempoten tanpa error dan tanpa menerapkan ulang; eksekusi `npm run migrate` pada database dev `cbt_sekolah` terbukti berjalan lancar dan idempoten; `npm test` lulus 7 dari 7 pengujian; `node --check scripts/migrate.js` lolos bersih.
+- Penyimpangan dari rencana: tidak ada.
+- Belum diverifikasi: tidak ada.
+
+### Laporan eksekusi T0.9
+- Diubah: `README.md`.
+- Verifikasi: Panduan instalasi diperbarui menyertakan impor `database/schema.sql` dan eksekusi `npm run migrate`; instruksi automated test (`npm test`) menggunakan database uji `cbt_sekolah_test` ditambahkan; klaim usang (seperti ketiadaan automated testing dan akun demo) dihapus; tautan lengkap ke seluruh dokumen spesifikasi di folder `docs/` (PRD, DESIGN, ERD, DECISION, RULES_AI, TODO) telah dicantumkan.
+- Penyimpangan dari rencana: tidak ada.
+- Belum diverifikasi: tidak ada.
 
 ## Hasil review
 _(Claude: per item `LULUS` / `PERBAIKI (BLOCKER|MAJOR|MINOR)` + bukti.)_

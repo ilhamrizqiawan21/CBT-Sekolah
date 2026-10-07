@@ -2,13 +2,19 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../models/db');
 const authController = require('../controllers/authController');
+const {
+    loginSiswaIpLimiter,
+    loginSiswaNisLimiter,
+    loginAdminLimiter,
+    loginGuruLimiter
+} = require('../middleware/rateLimiter');
 
 // Halaman login
 router.get('/login', (req, res) => {
     res.render('login', { error: null });
 });
 
-router.post('/login-siswa', authController.loginSiswa);
+router.post('/login-siswa', loginSiswaIpLimiter, loginSiswaNisLimiter, authController.loginSiswa);
 router.get('/logout', (req, res) => {
     req.session.destroy();
     res.redirect('/login');
@@ -56,7 +62,7 @@ router.get('/login-admin', (req, res) => {
     res.render('login-admin', { error: null });
 });
 
-router.post('/login-admin', async (req, res) => {
+router.post('/login-admin', loginAdminLimiter, async (req, res) => {
     const { username, password } = req.body;
     const pool = require('../models/db');
     const bcrypt = require('bcrypt');
@@ -83,7 +89,7 @@ router.get('/login-guru', (req, res) => {
     res.render('login-guru', { error: null });
 });
 
-router.post('/login-guru', async (req, res) => {
+router.post('/login-guru', loginGuruLimiter, async (req, res) => {
     const { username, password } = req.body;
     const pool = require('../models/db');
     const bcrypt = require('bcrypt');

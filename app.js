@@ -1,8 +1,10 @@
 const express    = require('express');
 const session    = require('express-session');
+const MySQLStore = require('express-mysql-session')(session);
 const path       = require('path');
 const http       = require('http');
 const socketIo   = require('socket.io');
+const pool       = require('./models/db');
 require('dotenv').config();
 
 const app    = express();
@@ -28,14 +30,29 @@ const io     = socketIo(server);
 const sessionSocketMap = new Map();
 
 // ─── Middleware ───
+app.set('trust proxy', 1);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
+
+const sessionStore = new MySQLStore({
+    clearExpired: true,
+    checkExpirationInterval: 900000, // 15 menit
+    expiration: 1000 * 60 * 60 * 24, // 1 hari
+    createDatabaseTable: true
+}, pool);
+
 app.use(session({
     secret:            process.env.SESSION_SECRET,
+    store:             sessionStore,
     resave:            false,
-    saveUninitialized: true,
-    cookie: { secure: false, maxAge: 1000 * 60 * 60 * 24 }
+    saveUninitialized: false,
+    cookie: {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure:   process.env.NODE_ENV === 'production',
+        maxAge:   1000 * 60 * 60 * 24
+    }
 }));
 
 app.set('views',       path.join(__dirname, 'views'));

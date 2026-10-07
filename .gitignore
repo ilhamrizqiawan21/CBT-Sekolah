@@ -7,6 +7,7 @@ node_modules/
 **/node_modules/
 *.sql
 !database/schema.sql
+!database/migrations/*.sql
 *.sqlite
 *.sqlite3
 backups/

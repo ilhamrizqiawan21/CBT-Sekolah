@@ -257,10 +257,38 @@ router.get('/pengajaran/hapus/:id', async (req, res) => {
 // ============================================================
 // SISWA — FIX #7: semua operasi PIN pakai bcrypt
 // ============================================================
-const multer = require('multer');
-const upload = multer({ dest: 'uploads/' });
-const xlsx   = require('xlsx');
-const fs     = require('fs');
+const multer  = require('multer');
+const path    = require('path');
+const ExcelJS = require('exceljs');
+const fs      = require('fs');
+const logger  = require('../utils/logger');
+
+const upload = multer({
+    dest: 'uploads/',
+    limits: { fileSize: 2 * 1024 * 1024 }, // 2 MB
+    fileFilter: (req, file, cb) => {
+        const ext = path.extname(file.originalname).toLowerCase();
+        if (ext !== '.xlsx') {
+            return cb(new Error('Hanya file Excel (.xlsx) yang diperbolehkan'));
+        }
+        cb(null, true);
+    }
+});
+
+const uploadMiddleware = (req, res, next) => {
+    upload.single('file_excel')(req, res, (err) => {
+        if (err) {
+            if (req.file && req.file.path) {
+                try { if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path); } catch {}
+            }
+            if (err.code === 'LIMIT_FILE_SIZE') {
+                return res.redirect('/admin/siswa?error=' + encodeURIComponent('Ukuran file melebihi batas maksimal (2 MB)'));
+            }
+            return res.redirect('/admin/siswa?error=' + encodeURIComponent(err.message));
+        }
+        next();
+    });
+};
 
 router.get('/siswa', async (req, res) => {
     const page = parseInt(req.query.page) || 1, limit = 10, offset = (page - 1) * limit;
@@ -292,40 +320,87 @@ router.get('/siswa/hapus/:id', async (req, res) => {
     catch (err) { console.error(err); res.redirect('/admin/siswa?error=Gagal hapus siswa, mungkin masih terhubung dengan data ujian'); }
 });
 
-router.get('/siswa/template', (req, res) => {
-    const workbook = xlsx.utils.book_new();
-    xlsx.utils.book_append_sheet(workbook, xlsx.utils.aoa_to_sheet([['NIS','NAMA','KELAS','PIN_UJIAN']]), 'Template_Siswa');
-    const buffer = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
-    res.setHeader('Content-Disposition', 'attachment; filename=template_siswa.xlsx');
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.send(buffer);
+router.get('/siswa/template', async (req, res) => {
+    try {
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Template_Siswa');
+        worksheet.columns = [
+            { header: 'NIS', key: 'nis', width: 15 },
+            { header: 'NAMA', key: 'nama', width: 30 },
+            { header: 'KELAS', key: 'kelas', width: 15 },
+            { header: 'PIN_UJIAN', key: 'pin_ujian', width: 15 }
+        ];
+        worksheet.getRow(1).font = { bold: true };
+        res.setHeader('Content-Disposition', 'attachment; filename=template_siswa.xlsx');
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        await workbook.xlsx.write(res);
+        res.end();
+    } catch (err) {
+        logger.error(`Download template siswa error: ${err.message}`);
+        res.redirect('/admin/siswa?error=Gagal mengunduh template siswa');
+    }
 });
 
 // Import Excel — FIX #7: hash PIN dari Excel
-router.post('/siswa/import', upload.single('file_excel'), async (req, res) => {
+router.post('/siswa/import', uploadMiddleware, async (req, res) => {
     if (!req.file) return res.redirect('/admin/siswa?error=File tidak ditemukan');
     const filePath = req.file.path;
     try {
-        const rows     = xlsx.utils.sheet_to_json(xlsx.readFile(filePath).Sheets[xlsx.readFile(filePath).SheetNames[0]], { header: 1 });
-        const dataRows = rows.slice(1);
-        let inserted = 0, errors = [];
-        for (let i = 0; i < dataRows.length; i++) {
-            const row = dataRows[i];
-            if (!row[0] || !row[1]) continue;
-            const pin = row[3] ? row[3].toString() : '1234';
-            try {
-                const hashed = await bcrypt.hash(pin, 10);
-                await pool.query('INSERT INTO siswa (nis, nama, kelas, pin_ujian) VALUES (?, ?, ?, ?)', [row[0].toString(), row[1].toString(), row[2] ? row[2].toString() : '', hashed]);
-                inserted++;
-            } catch (err) { errors.push(`Baris ${i+2}: ${err.message}`); }
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.readFile(filePath);
+        const worksheet = workbook.worksheets[0];
+        if (!worksheet) {
+            throw new Error('Worksheet Excel tidak ditemukan');
         }
-        try { fs.unlinkSync(filePath); } catch {}
+
+        const rowsToProcess = [];
+        worksheet.eachRow((row, rowNumber) => {
+            if (rowNumber === 1) return;
+            const nis = row.getCell(1).text ? row.getCell(1).text.trim() : '';
+            const nama = row.getCell(2).text ? row.getCell(2).text.trim() : '';
+            const kelas = row.getCell(3).text ? row.getCell(3).text.trim() : '';
+            const pinRaw = row.getCell(4).text ? row.getCell(4).text.trim() : '';
+            if (nis && nama) {
+                rowsToProcess.push({
+                    rowNumber,
+                    nis,
+                    nama,
+                    kelas,
+                    pin: pinRaw || '1234'
+                });
+            }
+        });
+
+        let inserted = 0, errors = [];
+        for (const item of rowsToProcess) {
+            try {
+                const hashed = await bcrypt.hash(item.pin, 10);
+                await pool.query(
+                    'INSERT INTO siswa (nis, nama, kelas, pin_ujian) VALUES (?, ?, ?, ?)',
+                    [item.nis, item.nama, item.kelas || null, hashed]
+                );
+                inserted++;
+            } catch (err) {
+                errors.push(`Baris ${item.rowNumber}: ${err.message}`);
+            }
+        }
+
+        try {
+            if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        } catch (unlinkErr) {
+            logger.error(`Gagal menghapus file upload: ${unlinkErr.message}`);
+        }
+
         const msg = `Import selesai. Berhasil: ${inserted}, Gagal: ${errors.length}`;
         if (errors.length > 0) return res.redirect(`/admin/siswa?error=${encodeURIComponent(msg + ' - ' + errors.join(', '))}`);
         res.redirect(`/admin/siswa?msg=${encodeURIComponent(msg)}`);
     } catch (err) {
-        console.error(err);
-        try { fs.unlinkSync(filePath); } catch {}
+        logger.error(`Import siswa error: ${err.message}`);
+        try {
+            if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        } catch (unlinkErr) {
+            logger.error(`Gagal menghapus file upload saat error: ${unlinkErr.message}`);
+        }
         res.redirect('/admin/siswa?error=Gagal memproses file Excel');
     }
 });

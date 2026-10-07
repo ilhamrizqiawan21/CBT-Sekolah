@@ -1,4 +1,6 @@
 const pool = require('../models/db');
+const bcrypt = require('bcrypt');
+const logger = require('../utils/logger');
 
 exports.loginSiswa = async (req, res) => {
     const { nis, pin, ujian_id } = req.body;
@@ -13,18 +15,40 @@ exports.loginSiswa = async (req, res) => {
     }
 
     try {
-        // ── Cek siswa ──
-        // FIX: Tidak lagi SELECT * — hanya ambil kolom yang dibutuhkan
+        // ── Cek siswa berdasarkan NIS ──
         const [siswa] = await pool.query(
-            `SELECT id, nama, nis, kelas
+            `SELECT id, nama, nis, kelas, pin_ujian
              FROM siswa
-             WHERE nis = ? AND pin_ujian = ?`,
-            [nis, pin]
+             WHERE nis = ?`,
+            [nis]
         );
         if (siswa.length === 0) {
             return res.render('login', { error: 'NIS atau PIN salah' });
         }
         const siswaData = siswa[0];
+
+        // ── Verifikasi PIN dengan bcrypt ──
+        const pinMatch = await bcrypt.compare(pin, siswaData.pin_ujian);
+        if (!pinMatch) {
+            return res.render('login', { error: 'NIS atau PIN salah' });
+        }
+
+        // ── Validasi kelas siswa = kelas pengajaran ujian (join ujian → pengajaran → kelas) ──
+        const [ujianRows] = await pool.query(
+            `SELECT u.id, k.nama_kelas
+             FROM ujian u
+             JOIN pengajaran p ON u.pengajaran_id = p.id
+             JOIN kelas k ON p.kelas_id = k.id
+             WHERE u.id = ? AND u.tanggal_mulai <= NOW() AND u.tanggal_selesai >= NOW()`,
+            [ujian_id]
+        );
+        if (ujianRows.length === 0) {
+            return res.render('login', { error: 'Ujian tidak tersedia atau belum dimulai/sudah berakhir' });
+        }
+
+        if (siswaData.kelas !== ujianRows[0].nama_kelas) {
+            return res.render('login', { error: 'Ujian ini tidak diperuntukkan bagi kelas Anda' });
+        }
 
         // ── Cek apakah sudah pernah mengerjakan ujian ini ──
         const [nilai] = await pool.query(
@@ -36,8 +60,7 @@ exports.loginSiswa = async (req, res) => {
             return res.render('login', { error: 'Anda sudah mengerjakan ujian ini sebelumnya!' });
         }
 
-        // ── FIX #12 — Cek sesi aktif (sekarang benar-benar terisi oleh app.js) ──
-        // Cegah login ganda dari dua perangkat berbeda
+        // ── Cek sesi aktif ──
         const [sesi] = await pool.query(
             `SELECT id, status FROM sesi_ujian
              WHERE siswa_id = ? AND ujian_id = ?`,
@@ -55,32 +78,21 @@ exports.loginSiswa = async (req, res) => {
                     error: 'Akses ujian Anda telah dicabut karena pelanggaran. Hubungi pengawas.'
                 });
             }
-            // status = 'selesai' → sudah tercakup oleh cek nilai_ujian di atas
-        }
-
-        // ── Cek validitas waktu ujian ──
-        const [ujian] = await pool.query(
-            `SELECT id FROM ujian
-             WHERE id = ? AND tanggal_mulai <= NOW() AND tanggal_selesai >= NOW()`,
-            [ujian_id]
-        );
-        if (ujian.length === 0) {
-            return res.render('login', { error: 'Ujian tidak tersedia atau belum dimulai/sudah berakhir' });
         }
 
         // ── Simpan session ──
         req.session.siswaId   = siswaData.id;
         req.session.siswaNama = siswaData.nama;
-        req.session.ujianId   = parseInt(ujian_id); // pastikan integer, bukan string
+        req.session.ujianId   = parseInt(ujian_id);
         req.session.siswaNis  = siswaData.nis;
 
         req.session.save(err => {
-            if (err) console.error('Session save error:', err);
+            if (err) logger.error(`Session save error: ${err.message}`);
             res.redirect('/ujian');
         });
 
     } catch (err) {
-        console.error('loginSiswa error:', err);
+        logger.error(`loginSiswa error: ${err.message}`, { stack: err.stack });
         res.render('login', { error: 'Terjadi kesalahan server' });
     }
 };

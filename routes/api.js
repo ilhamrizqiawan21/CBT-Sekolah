@@ -93,8 +93,11 @@ setInterval(() => {
 // ─────────────────────────────────────────────
 router.get('/daftar-ujian', async (req, res) => {
     const [rows] = await pool.query(
-        `SELECT id, nama_ujian FROM ujian
-         WHERE tanggal_mulai <= NOW() AND tanggal_selesai >= NOW()`
+        `SELECT u.id, u.nama_ujian, k.nama_kelas
+         FROM ujian u
+         JOIN pengajaran p ON u.pengajaran_id = p.id
+         JOIN kelas k ON p.kelas_id = k.id
+         WHERE u.tanggal_mulai <= NOW() AND u.tanggal_selesai >= NOW()`
     );
     res.json(rows);
 });

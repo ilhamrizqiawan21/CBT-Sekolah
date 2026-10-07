@@ -249,7 +249,8 @@
             }
             select.innerHTML = '<option value="">-- Pilih Ujian --</option>';
             data.forEach(ujian => {
-                select.innerHTML += `<option value="${ujian.id}">${ujian.nama_ujian}</option>`;
+                const label = ujian.nama_kelas ? `${ujian.nama_ujian} (${ujian.nama_kelas})` : ujian.nama_ujian;
+                select.innerHTML += `<option value="${ujian.id}">${label}</option>`;
             });
         })
         .catch(() => {
