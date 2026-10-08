@@ -9,6 +9,15 @@ const {
     loginGuruLimiter
 } = require('../middleware/rateLimiter');
 
+// Landing page: pilih peran; pengguna yang sudah login langsung ke halamannya
+router.get('/', (req, res) => {
+    const sess = req.session || {};
+    if (sess.adminId) return res.redirect('/admin/dashboard');
+    if (sess.guruId) return res.redirect('/guru/dashboard');
+    if (sess.siswaId && sess.ujianId) return res.redirect('/ujian');
+    res.render('landing');
+});
+
 // Halaman login
 router.get('/login', (req, res) => {
     res.render('login', { error: null });

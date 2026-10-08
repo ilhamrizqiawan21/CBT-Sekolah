@@ -255,7 +255,7 @@ Kolom **Dep** = item yang harus `DONE` lebih dulu. **Owner** `G` = Gemini, `U` =
 ## R-FINAL — Review akhir oleh Claude
 - Owner: **Claude** — Dep: seluruh item Fase 0–6 yang bukan `BLOCKED` berstatus `DONE`.
 - Mengikuti protokol di [CLAUDE.md](CLAUDE.md#protokol-review-akhir-r-final). Hasil ditulis di bawah.
-- Status: `TODO`
+- Status: `DONE` (2026-10-09; lihat "Hasil review" → R-FINAL)
 
 ---
 ## Catatan eksekutor
@@ -565,3 +565,9 @@ Dijalankan sendiri: `npm test` 123/123 lulus (32 suites). `npm audit`: 7 temuan 
 - M5: label/placeholder "kata kunci essay" di `views/admin/soal.ejs` dihapus.
 - Tes baru `tests/rfinal_minor.test.js` (5, semuanya gagal sebelum perbaikan); `npm test` 135/135.
 - Belum diuji langsung: rute `simpan-jawaban` (tanpa tes endpoint; hanya lewat suite yang ada) dan klik tombol hapus di browser (Playwright tidak dijalankan).
+
+**Penutupan R-FINAL (Claude, 2026-10-09):** `LULUS` dengan catatan.
+- Semua BLOCKER/MAJOR (B1, M1) dan MINOR (M2–M5) tertutup; M6 (`npm audit`) diterima sebagai risiko rendah.
+- Verifikasi akhir: `npm test` 139/139; `test:ui` 17/17; `test:ui:monitor` 7/7.
+- Tambahan di luar daftar TODO: landing page `GET /` (`views/landing.ejs`, `tests/landing.test.js`) — dicek di 360px (tanpa scroll horizontal, kartu ≥ 67 px).
+- **Belum diverifikasi / terbuka:** uji beban 410 klien tidak dijalankan ulang oleh reviewer (angka T6.3 berasal dari laporan eksekutor); tombol hapus (form POST) belum diklik di browser; HP fisik dan Exambro/SEB; T6.5 `BLOCKED` menunggu D-002; D-017 menunggu sekolah.
