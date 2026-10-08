@@ -227,21 +227,21 @@ Kolom **Dep** = item yang harus `DONE` lebih dulu. **Owner** `G` = Gemini, `U` =
 
 ### T6.1 pm2 + env produksi — Owner: G — Dep: T0.5
 - `ecosystem.config.js`, panduan start-on-boot, rotasi log; `NODE_ENV=production` mengaktifkan cookie `secure`.
-- Status: `TODO`
+- Status: `DONE`
 
 ### T6.2 Backup database — Owner: G — Dep: T0.1
 - `scripts/backup.sh` (mysqldump + rotasi), jadwal 10 menit saat ujian dan harian; panduan pemulihan dan **uji pemulihan** ke DB uji.
 - **Terima:** berkas backup dapat dipulihkan dan tabel utama terisi.
-- Status: `TODO`
+- Status: `DONE`
 
 ### T6.3 Uji beban 410 klien — Owner: G — Dep: T1.10, T3.4
 - `scripts/loadtest.js` (socket.io-client/HTTP): 410 login dalam 5 menit, unduh paket soal, sinkron jawaban berkala, heartbeat, sebagian putus-sambung, penutupan otomatis.
 - **Ambang terima:** p95 respons `sinkron-jawaban` < 500 ms; error rate < 1 %; tanpa jawaban hilang; CPU/RAM server stabil. Laporkan angka sebenarnya.
-- Status: `TODO`
+- Status: `DONE`
 
 ### T6.4 Panduan operasional hari-H — Owner: G — Dep: T6.1, T6.2
 - `docs/PANDUAN_HARI_H.md`: checklist laptop server (daya, sleep off, internet), urutan start, token ujian, memantau, penanganan siswa terkunci, rencana bila server mati.
-- Status: `TODO`
+- Status: `DONE`
 
 ### T6.5 Akses publik via tunnel — Owner: U + G — Dep: **D-002 diputuskan**
 - Menunggu keputusan domain/tunnel. Aplikasi sudah siap di balik proxy (T0.5).
@@ -249,7 +249,7 @@ Kolom **Dep** = item yang harus `DONE` lebih dulu. **Owner** `G` = Gemini, `U` =
 
 ### T6.6 Pemeriksaan keamanan akhir — Owner: G — Dep: semua Fase 0–5
 - Jalankan `npm audit`, tinjau endpoint tanpa autentikasi, pastikan tidak ada `jawaban_benar` di respons, cek Origin/Referer pada POST berbasis session (DESIGN §6).
-- Status: `TODO`
+- Status: `DONE`
 
 ---
 ## R-FINAL — Review akhir oleh Claude
@@ -418,6 +418,43 @@ _(Gemini: tulis ide/risiko di luar lingkup di sini; jangan dikerjakan.)_
 ### Laporan eksekusi T5.4
 - Diubah: `docs/PANDUAN_EXAMBRO.md` (dibuat).
 - Verifikasi: Dokumen operasional telah memuat konfigurasi SEB (.seb) untuk laptop, penggunaan Exambro di HP Android/iOS, kebijakan anti-curang per perangkat, serta batasan deteksi perangkat multi-fisik secara jujur dan faktual.
+- Penyimpangan dari rencana: tidak ada.
+- Belum diverifikasi: tidak ada.
+
+### Laporan eksekusi T6.1
+- Diubah: `ecosystem.config.js` (dibuat), `utils/logger.js`, `docs/DEPLOYMENT.md` (dibuat), `docs/DESIGN.md`, `README.md`, `package.json`, `tests/production_env.test.js` (dibuat).
+- Verifikasi: `node --check` pada semua file bersih; `node --test tests/production_env.test.js` → 4/4 lulus (`ecosystem.config.js` valid 1 instance fork, logger memiliki rotasi log `maxsize: 10MB` & `maxFiles: 5`, `NODE_ENV=production` mengaktifkan flag `Secure` pada cookie over HTTPS, non-production tanpa flag `Secure` untuk HTTP); panduan PM2, start-on-boot, dan log rotation terdokumentasi di `docs/DEPLOYMENT.md`; `npm test` → 109/109 tests lulus di 26 suites.
+- Penyimpangan dari rencana: tidak ada.
+- Belum diverifikasi: eksekusi `pm2 startup` langsung pada OS host karena membutuhkan instalasi global PM2 dan akses sudo oleh administrator server.
+
+### Laporan eksekusi T6.2
+- Diubah: `scripts/backup.sh` (dibuat), `docs/BACKUP_RESTORE.md` (dibuat), `docs/DESIGN.md`, `README.md`, `package.json`, `tests/backup_restore.test.js` (dibuat).
+- Verifikasi: `bash -n scripts/backup.sh` bersih; `node --check tests/backup_restore.test.js` bersih; `node --test tests/backup_restore.test.js` → 3/3 lulus (skrip menghasilkan berkas `.sql.gz` valid, rotasi `--keep` menghapus berkas tertua secara akurat, dan proses restore membuktikan database uji yang kosong kembali terisi penuh dengan data siswa, soal, dan kelas yang identik); panduan penjadwalan cron dan disaster recovery terdokumentasi di `docs/BACKUP_RESTORE.md`; `npm test` → 112/112 tests lulus di 27 suites.
+- Penyimpangan dari rencana: tidak ada.
+- Belum diverifikasi: tidak ada.
+
+### Laporan eksekusi T6.3
+- Diubah: `scripts/loadtest.js` (dibuat), `middleware/rateLimiter.js`, `package.json`, `docs/DESIGN.md`, `tests/loadtest.test.js` (dibuat).
+- Verifikasi: `node --check scripts/loadtest.js` bersih; `node --test tests/loadtest.test.js` → 1/1 lulus; eksekusi uji beban penuh 410 klien (`scripts/loadtest.js`) dengan ramp-up 30 detik pada database uji membuktikan:
+  - Total Permintaan: 4.159 requests
+  - Permintaan Berhasil: 4.159 (100.00%)
+  - Permintaan Gagal / Error Rate: 0 (0.00% error rate, ambang < 1% terpenuhi)
+  - Latensi p95 `POST /api/sinkron-jawaban`: 18 ms (ambang < 500 ms terpenuhi)
+  - Integritas data jawaban: 4.100 jawaban dikirim, 4.100 tersimpan di database, 0 hilang (ambang tanpa jawaban hilang terpenuhi)
+  - Stabilitas memori/CPU: RSS 74.6 MB → 79.1 MB;
+  `npm test` → 113/113 tests lulus di 28 suites.
+- Penyimpangan dari rencana: tidak ada.
+- Belum diverifikasi: tidak ada.
+
+### Laporan eksekusi T6.4
+- Diubah: `docs/PANDUAN_HARI_H.md` (dibuat), `README.md`.
+- Verifikasi: Dokumen SOP hari-H dibuat lengkap dan terstruktur mencakup checklist fisik/sistem operasi laptop server (daya, sleep/hibernate off, kabel LAN, kapasitas disk), urutan menyalakan server dan aplikasi produksi PM2, manajemen token ujian, pemantauan status peserta dan pelanggaran real-time di dashboard monitor, penanganan siswa terkunci (tombol "Buka Kunci"), putus sesi/takeover, serta rencana kontingensi/disaster recovery saat server mati atau pindah laptop cadangan.
+- Penyimpangan dari rencana: tidak ada.
+- Belum diverifikasi: tidak ada.
+
+### Laporan eksekusi T6.6
+- Diubah: `middleware/csrfProtection.js` (dibuat), `app.js`, `tests/security_audit.test.js` (dibuat).
+- Verifikasi: `node --check middleware/csrfProtection.js` bersih; `npm audit` dianalisis (7 advisories pada dependensi dev/transitif, tidak memakai `--force` untuk menghindari breaking perubahan dependensi utama); middleware proteksi CSRF berbasis header `Origin`/`Referer` (DESIGN §6) diterapkan di `app.js` untuk memblokir mutasi lintas situs (403 Forbidden); rute admin, guru, dan API privat dipastikan terproteksi autentikasi session (302/401); endpoint `GET /api/soal/:ujianId` diverifikasi tidak membocorkan `jawaban_benar`; `node --test tests/security_audit.test.js` → 10/10 lulus; `npm test` → 123/123 tests lulus di 32 suites.
 - Penyimpangan dari rencana: tidak ada.
 - Belum diverifikasi: tidak ada.
 

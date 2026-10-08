@@ -10,7 +10,7 @@ Aplikasi CBT dirancang responsif (viewport mobile 360×640 px, target sentuh min
 
 ### Langkah Membuka di Exambro:
 1. **Instalasi Aplikasi:**
-   - Siswa mengunduh dan memasang aplikasi Exambro resmi sekolah dari Google Play Store atau file APK yang disiapkan proktor sekolah (misal: *Exambro*, *Candy CBT Browser*, atau *FlyExam*).
+   - Siswa mengunduh dan memasang aplikasi Exambro resmi sekolah dari Google Play Store atau file APK yang disiapkan proktor sekolah (aplikasi pengunci ujian yang dipakai sekolah).
 2. **Memasukkan URL Ujian:**
    - Buka aplikasi Exambro.
    - Pindai kode QR yang dibagikan proktor di papan tulis/ruang kelas, atau ketik langsung URL portal ujian sekolah (misal: `https://cbt.sekolah.sch.id` atau URL IP lokal LAN/tunnel yang aktif).
@@ -19,14 +19,14 @@ Aplikasi CBT dirancang responsif (viewport mobile 360×640 px, target sentuh min
    - Siswa memasukkan NIS, PIN, memilih Ujian, dan memasukkan Token Ujian (jika ujian menggunakan token).
    - Setelah login, antarmuka ujian akan langsung aktif tanpa memunculkan modal overlay fullscreen desktop.
 4. **Kebijakan Pelanggaran di HP:**
-   - Jika siswa mencoba keluar aplikasi, meminimalisir aplikasi, membuka recent apps, atau menekan tombol navigasi sistem HP yang menyebabkan jendela browser tidak aktif, browser akan memicu event `pindah-tab`.
-   - Event `pindah-tab` dan `copy-paste` tetap dicatat sebagai pelanggaran resmi dan disiarkan real-time ke Dashboard Pengawas.
+   - Aplikasi CBT mencatat pelanggaran `pindah-tab` dan `copy-paste` bila peramban melaporkannya, lalu menyiarkannya ke Dashboard Pengawas.
+   - **Belum diverifikasi:** apakah setiap aplikasi Exambro memicu event `pindah-tab` saat siswa keluar aplikasi atau membuka recent apps. Ini bergantung pada aplikasi dan versi Android; uji dulu di perangkat sekolah sebelum mengandalkannya.
 
 ---
 
 ## 2. Penggunaan Safe Exam Browser (SEB) pada Laptop / Komputer
 
-Safe Exam Browser (SEB) mengunci lingkungan desktop (Windows / macOS) sehingga siswa tidak dapat membuka aplikasi peramban lain, berpindah jendela, atau mengambil tangkapan layar (screenshot).
+Safe Exam Browser (SEB) mengunci lingkungan desktop (Windows / macOS) sehingga siswa dibatasi membuka aplikasi lain atau berpindah jendela. Cakupan pembatasan (termasuk screenshot) bergantung pada versi dan konfigurasi SEB; periksa dokumentasi resmi SEB dan uji pada perangkat sekolah.
 
 ### Langkah Menyiapkan Konfigurasi SEB (.seb):
 1. **Instalasi SEB:**
@@ -55,5 +55,5 @@ Safe Exam Browser (SEB) mengunci lingkungan desktop (Windows / macOS) sehingga s
 2. **Fitur Layar Penuh pada Laptop Non-SEB:**
    Jika laptop digunakan dengan browser standar (Chrome/Firefox/Edge) tanpa SEB, CBT menerapkan mode **Wajib Layar Penuh**. Siswa yang keluar dari layar penuh (menekan tombol Esc atau Alt+Tab) akan diberikan waktu hitung mundur 10 detik untuk kembali sebelum dicatat sebagai pelanggaran resmi.
 3. **Ketahanan Koneksi:**
-   Bila koneksi siswa di Exambro/SEB terputus, siswa tetap dapat melanjutkan ujian karena seluruh jawaban tersimpan di memori lokal (*localStorage*) dan akan disinkronkan otomatis saat koneksi pulih kembali.
+   Bila koneksi siswa di Exambro/SEB terputus, siswa tetap dapat melanjutkan ujian dan jawaban akan disinkronkan saat koneksi pulih. Detail penyimpanan lokal dan batas waktu putus koneksi belum diuji untuk panduan ini; lihat DESIGN dan hasil uji ketahanan (Fase 1).
 

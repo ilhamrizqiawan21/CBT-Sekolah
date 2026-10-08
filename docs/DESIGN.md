@@ -127,10 +127,10 @@ Job server tiap 30 detik: untuk sesi `sedang_ujian` dengan `NOW() > batas_waktu 
 
 ## 7. Deployment
 - Satu laptop khusus server: sleep/hibernate dimatikan, daya selalu tersambung, jaringan kabel bila ada.
-- `pm2` untuk auto-restart dan start saat boot; log rotasi (winston).
-- Backup: `mysqldump` tiap 10 menit saat ujian dan harian di luar ujian, rotasi, salinan ke media lain.
+- `pm2` untuk auto-restart dan start saat boot (`ecosystem.config.js`, panduan di `docs/DEPLOYMENT.md`); log rotasi (winston `maxsize: 10MB`, `maxFiles: 5`).
+- Backup: `scripts/backup.sh` (mysqldump / mariadb-dump + gzip) tiap 10 menit saat ujian dan harian di luar ujian, rotasi berkas otomatis (panduan di `docs/BACKUP_RESTORE.md`).
 - Akses publik via tunnel gratis — **belum diputuskan** (D-002).
-- Uji beban sebelum hari-H: skrip yang mensimulasikan 410 klien (login serentak, unduh soal, sinkron jawaban, heartbeat).
+- Uji beban sebelum hari-H: skrip yang mensimulasikan 410 klien (`scripts/loadtest.js`: login serentak, unduh soal, sinkron jawaban, heartbeat, putus-sambung).
 
 ## 8. Strategi pengujian
 - `node:test` untuk `penilaianService`, `sesiService` (hitung sisa waktu, takeover, grace), dan finalisasi.

@@ -7,17 +7,28 @@ async function seedDevelopmentData() {
     const user = process.env.DB_USER || 'root';
     const password = process.env.DB_PASSWORD || '';
     const database = process.env.DB_NAME || 'cbt_sekolah';
+    const socketPath = process.env.DB_SOCKET;
 
     console.log(`[SEED] Seeding data pengembangan ke database: ${database}...`);
 
-    const pool = await mysql.createPool({
-        host,
+    const poolConfig = {
         user,
         password,
         database,
         waitForConnections: true,
         connectionLimit: 5
-    });
+    };
+
+    if (socketPath) {
+        poolConfig.socketPath = socketPath;
+    } else {
+        poolConfig.host = host;
+        if (process.env.DB_PORT) {
+            poolConfig.port = Number(process.env.DB_PORT);
+        }
+    }
+
+    const pool = await mysql.createPool(poolConfig);
 
     try {
         // 1. Admin default (admin / admin123)

@@ -1,9 +1,9 @@
 const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 
-// Rate limiter per IP longgar untuk login siswa (maks 300 per 15 menit)
+// Rate limiter per IP longgar untuk login siswa (default 600 per 15 menit agar mencakup 410 siswa serentak dari 1 IP NAT sekolah)
 const loginSiswaIpLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    limit: 300,
+    limit: Number(process.env.RATE_LIMIT_LOGIN_IP || 600),
     keyGenerator: (req) => ipKeyGenerator(req),
     message: 'Terlalu banyak permintaan login dari jaringan ini. Silakan coba lagi setelah 15 menit.',
     standardHeaders: true,

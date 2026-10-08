@@ -603,8 +603,8 @@ async function selesaiUjian() {
 // ── Socket Events ──
 socket.on('connect', () => {
     console.log('Socket connected:', socket.id);
-    const devType = window.deviceType || 'laptop';
-    socket.emit('siswa-siap', { ujian_id: ujianId, siswa_id: siswaId, device_type: devType });
+    // Identitas dan tipe perangkat ditentukan server dari sesi login
+    socket.emit('siswa-siap');
 });
 
 socket.on('mulai-ujian', ({ durasi, sisa_detik }) => {

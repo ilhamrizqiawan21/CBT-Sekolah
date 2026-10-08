@@ -16,17 +16,28 @@ async function runMigrations(options = {}) {
     const host = options.host || process.env.DB_HOST || '127.0.0.1';
     const user = options.user || process.env.DB_USER || 'root';
     const password = options.password !== undefined ? options.password : (process.env.DB_PASSWORD || '');
+    const socketPath = options.socketPath || process.env.DB_SOCKET;
     const migrationsDir = options.migrationsDir || path.join(__dirname, '..', 'database', 'migrations');
 
     console.log(`[MIGRATE] Menjalankan migrasi pada database: ${targetDb}`);
 
-    const connection = await mysql.createConnection({
-        host,
+    const connectionConfig = {
         user,
         password,
         database: targetDb,
         multipleStatements: true
-    });
+    };
+
+    if (socketPath) {
+        connectionConfig.socketPath = socketPath;
+    } else {
+        connectionConfig.host = host;
+        if (options.port || process.env.DB_PORT) {
+            connectionConfig.port = Number(options.port || process.env.DB_PORT);
+        }
+    }
+
+    const connection = await mysql.createConnection(connectionConfig);
 
     try {
         // 1. Buat tabel schema_migrations jika belum ada

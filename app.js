@@ -57,6 +57,8 @@ const sessionMiddleware = session({
 });
 
 app.use(sessionMiddleware);
+const { verifySameOrigin } = require('./middleware/csrfProtection');
+app.use(verifySameOrigin);
 io.engine.use(sessionMiddleware);
 app.set('io', io);
 
@@ -97,7 +99,9 @@ async function cekDanPaksaSubmit(pool, socket, siswa_id, ujian_id, jenisKecurang
 
     if (jumlah >= batas) {
         // FIX #4 — Paksa submit langsung via socket DAN catat di DB
-        socket.emit('paksa-submit');
+        socket.emit('paksa-submit', {
+            message: `⚠️ Batas pelanggaran (${jumlah}/${batas}) terlampaui. Ujian Anda diakhiri.`
+        });
         sessionSocketMap.delete(socket.id);
 
         // Update sesi_ujian ke keluar_paksa (FIX #12 — sesi sudah ada)
@@ -144,15 +148,19 @@ io.on('connection', (socket) => {
     });
 
     // ── siswa-siap ──
-    socket.on('siswa-siap', async ({ ujian_id, siswa_id, device_type }) => {
-        console.log('siswa-siap: ujian_id=%s siswa_id=%s device_type=%s', ujian_id, siswa_id, device_type);
+    // Identitas dan tipe perangkat diambil dari sesi login (bukan payload klien).
+    socket.on('siswa-siap', async () => {
+        const sess = socket.request.session;
+        const siswa_id = sess && sess.siswaId;
+        const ujian_id = sess && sess.ujianId;
+        console.log('siswa-siap: ujian_id=%s siswa_id=%s device_type=%s', ujian_id, siswa_id, sess && sess.deviceType);
 
         if (!siswa_id || !ujian_id) {
             socket.emit('error', { message: 'Data siswa tidak valid' });
             return;
         }
 
-        const validDeviceType = (device_type === 'hp' || device_type === 'laptop') ? device_type : null;
+        const validDeviceType = (sess.deviceType === 'hp' || sess.deviceType === 'laptop') ? sess.deviceType : null;
         sessionSocketMap.set(socket.id, { siswa_id, ujian_id, device_type: validDeviceType });
 
         const pool = require('./models/db');

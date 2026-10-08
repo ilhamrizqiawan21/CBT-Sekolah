@@ -10,7 +10,10 @@
     "migrate": "node scripts/migrate.js",
     "seed": "node scripts/seed.js",
     "test:ui": "node tests/ui/arab_hp.ui.js",
-    "test:ui:monitor": "node tests/ui/monitor.ui.js"
+    "test:ui:monitor": "node tests/ui/monitor.ui.js",
+    "start:prod": "pm2 start ecosystem.config.js --env production",
+    "backup": "bash scripts/backup.sh",
+    "loadtest": "node scripts/loadtest.js"
   },
   "keywords": [],
   "author": "",

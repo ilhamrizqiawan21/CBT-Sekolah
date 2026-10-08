@@ -11,6 +11,9 @@ Spesifikasi lengkap, keputusan teknis, arsitektur, dan status implementasi dapat
 - [DESIGN](docs/DESIGN.md) — Arsitektur sistem, alur sesi, kontrak API, dan pertimbangan teknis
 - [ERD](docs/ERD.md) — Skema database dan relasi antar tabel
 - [DECISION](docs/DECISION.md) — Catatan keputusan arsitektur (ADR)
+- [DEPLOYMENT](docs/DEPLOYMENT.md) — Panduan deployment produksi, PM2, dan rotasi log
+- [BACKUP & PEMULIHAN](docs/BACKUP_RESTORE.md) — Strategi backup otomatis dan pemulihan bencana (disaster recovery)
+- [PANDUAN HARI-H](docs/PANDUAN_HARI_H.md) — Checklist teknis hari pelaksanaan ujian dan penanganan insiden
 - [RULES_AI](docs/RULES_AI.md) — Aturan teknis dan keamanan pengembangan
 - [TODO](docs/TODO.md) — Rencana implementasi dan status eksekusi per fase
 
@@ -85,7 +88,10 @@ npm run dev
 - Mode produksi:
 ```bash
 npm start
+# atau menggunakan PM2 (rekomendasi produksi):
+npm run start:prod
 ```
+Panduan lengkap deployment, rotasi log, dan start-on-boot dapat dilihat di [Panduan Deployment](docs/DEPLOYMENT.md).
 
 Aplikasi dapat diakses melalui peramban di `http://localhost:3000`.
 
