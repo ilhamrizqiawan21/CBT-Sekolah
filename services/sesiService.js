@@ -119,18 +119,15 @@ async function perpanjang(sesiOrId, menit, db = defaultPool) {
     if (rows.length === 0) {
         throw new Error('Sesi ujian tidak ditemukan');
     }
-    const sesi = rows[0];
+    const tambah = parseInt(menit, 10);
 
-    const tambahanMenit = (sesi.tambahan_menit || 0) + parseInt(menit, 10);
-    const currentBatas = new Date(sesi.batas_waktu);
-    const newBatas = new Date(currentBatas.getTime() + parseInt(menit, 10) * 60 * 1000);
-
+    // Penambahan atomik di SQL agar dua aksi bersamaan tidak saling menimpa
     await db.query(
         `UPDATE sesi_ujian
-         SET tambahan_menit = ?,
-             batas_waktu = ?
+         SET tambahan_menit = COALESCE(tambahan_menit, 0) + ?,
+             batas_waktu = DATE_ADD(batas_waktu, INTERVAL ? MINUTE)
          WHERE id = ?`,
-        [tambahanMenit, newBatas, sesiId]
+        [tambah, tambah, sesiId]
     );
 
     const [updatedRows] = await db.query('SELECT * FROM sesi_ujian WHERE id = ?', [sesiId]);

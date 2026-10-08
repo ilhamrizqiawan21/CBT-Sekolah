@@ -3,6 +3,7 @@ const router  = express.Router();
 const pool    = require('../models/db');
 const { cekWaktuUjian } = require('../utils/helper');
 const { isSiswaAPI } = require('../middleware/auth');
+const monitorService = require('../services/monitorService');
 
 // ─────────────────────────────────────────────
 // FIX #3 — Rate limiter in-memory
@@ -73,7 +74,8 @@ function seededShuffle(array, rng) {
 // ─────────────────────────────────────────────
 router.get('/daftar-ujian', async (req, res) => {
     const [rows] = await pool.query(
-        `SELECT u.id, u.nama_ujian, k.nama_kelas
+        `SELECT u.id, u.nama_ujian, k.nama_kelas,
+                (u.token_ujian IS NOT NULL AND TRIM(u.token_ujian) != '') AS butuh_token
          FROM ujian u
          JOIN pengajaran p ON u.pengajaran_id = p.id
          JOIN kelas k ON p.kelas_id = k.id
@@ -394,10 +396,11 @@ router.post('/sinkron-jawaban', isSiswaAPI, async (req, res) => {
             }
 
             // Hitung is_benar di sisi server (kunci jawaban tidak dibocorkan)
-            const isBenar = hitungIsBenar(soal, item.jawaban);
-            const jawabanStr = typeof item.jawaban === 'object'
-                ? JSON.stringify(item.jawaban)
-                : (item.jawaban !== undefined && item.jawaban !== null ? String(item.jawaban) : '');
+            const inputJawaban = item.jawaban !== undefined ? item.jawaban : item.jawaban_dipilih;
+            const isBenar = hitungIsBenar(soal, inputJawaban);
+            const jawabanStr = typeof inputJawaban === 'object'
+                ? JSON.stringify(inputJawaban)
+                : (inputJawaban !== undefined && inputJawaban !== null ? String(inputJawaban) : '');
 
             await pool.query(
                 `INSERT INTO jawaban_siswa (siswa_id, ujian_id, soal_id, jawaban_dipilih, is_benar, client_ts)
@@ -423,6 +426,12 @@ router.post('/sinkron-jawaban', isSiswaAPI, async (req, res) => {
             'UPDATE sesi_ujian SET last_seen = NOW() WHERE id = ?',
             [sesi.id]
         );
+
+        // Siarkan update progres jawaban ke dashboard monitor admin
+        const io = req.app.get('io');
+        if (io && tersinkronCount > 0) {
+            await monitorService.siarkanUpdateSiswa(io, ujian_id, siswa_id, pool, { event: 'jawab' });
+        }
 
         // Berikan respons konfirmasi tanpa membocorkan jawaban_benar / kunci
         res.json({
@@ -556,6 +565,11 @@ router.post('/selesai-ujian', isSiswaAPI, async (req, res) => {
     try {
         const { finalizeSesi } = require('../services/finalizeService');
         const hasil = await finalizeSesi(siswa_id, ujian_id, pool);
+
+        const io = req.app.get('io');
+        if (io) {
+            await monitorService.siarkanUpdateSiswa(io, ujian_id, siswa_id, pool, { event: 'selesai' });
+        }
 
         const tampilkanNilai = process.env.TAMPILKAN_NILAI_SISWA === 'true';
         if (tampilkanNilai) {

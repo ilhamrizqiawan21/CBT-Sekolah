@@ -7,11 +7,16 @@ const { getTestPool, closeTestPool, TEST_DB_NAME } = require('./helpers/db');
 
 describe('Infrastruktur Migrasi (scripts/migrate.js)', () => {
     let pool;
+    let savedMigrations = [];
     const tempMigrationsDir = path.join(__dirname, 'temp_migrations');
 
     before(async () => {
         pool = getTestPool();
-        // Bersihkan tabel schema_migrations di DB test jika ada
+        // Backup dan bersihkan tabel schema_migrations di DB test jika ada
+        try {
+            const [rows] = await pool.query('SELECT version, applied_at FROM schema_migrations');
+            savedMigrations = rows;
+        } catch (_) {}
         await pool.query('DROP TABLE IF EXISTS schema_migrations');
         await pool.query('DROP TABLE IF EXISTS _test_migration_table');
 
@@ -24,6 +29,17 @@ describe('Infrastruktur Migrasi (scripts/migrate.js)', () => {
     after(async () => {
         await pool.query('DROP TABLE IF EXISTS _test_migration_table');
         await pool.query('DROP TABLE IF EXISTS schema_migrations');
+        if (savedMigrations.length > 0) {
+            await pool.query(`
+                CREATE TABLE IF NOT EXISTS schema_migrations (
+                    version VARCHAR(255) PRIMARY KEY,
+                    applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB;
+            `);
+            for (const m of savedMigrations) {
+                await pool.query('INSERT IGNORE INTO schema_migrations (version, applied_at) VALUES (?, ?)', [m.version, m.applied_at]);
+            }
+        }
         if (fs.existsSync(tempMigrationsDir)) {
             fs.rmSync(tempMigrationsDir, { recursive: true, force: true });
         }

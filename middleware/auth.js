@@ -5,6 +5,10 @@ const logger = require('../utils/logger');
 module.exports = {
     isAdmin: (req, res, next) => {
         if (req.session && req.session.adminId) return next();
+        const loginNonAdmin = req.session && (req.session.guruId || req.session.siswaId);
+        if (req.path.startsWith('/api/monitor') || (loginNonAdmin && req.path.startsWith('/api/'))) {
+            return res.status(403).json({ error: 'Akses ditolak: Hanya admin yang diizinkan' });
+        }
         res.redirect('/login-admin');
     },
     isGuru: (req, res, next) => {

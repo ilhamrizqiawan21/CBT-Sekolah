@@ -475,9 +475,10 @@
 
 <!-- Variabel untuk ujian.js -->
 <script>
-    window.ujianId   = '<%= ujianId %>';
-    window.siswaId   = '<%= siswa.id %>';
-    window.siswaNama = '<%= siswa.nama %>';
+    window.ujianId    = '<%= ujianId %>';
+    window.siswaId    = '<%= siswa.id %>';
+    window.siswaNama  = '<%= siswa.nama %>';
+    window.deviceType = '<%= typeof deviceType !== "undefined" ? deviceType : "laptop" %>';
 </script>
 <script src="/socket.io/socket.io.js"></script>
 <script src="/js/ujian.js"></script>
@@ -507,8 +508,11 @@
     // (dicatat juga di server via socket)
     let fsPelanggaranCount = 0;
 
+    const isHpDevice    = (window.deviceType === 'hp');
+
     /* ── Deteksi dukungan Fullscreen API ── */
     function fsSupported() {
+        if (isHpDevice) return false;
         return !!(
             document.fullscreenEnabled       ||
             document.webkitFullscreenEnabled  ||
@@ -519,6 +523,7 @@
 
     /* ── Cek apakah saat ini fullscreen ── */
     function isFullscreen() {
+        if (isHpDevice) return true; // Pada HP, fullscreen tidak diwajibkan
         return !!(
             document.fullscreenElement       ||
             document.webkitFullscreenElement  ||
@@ -529,6 +534,7 @@
 
     /* ── Request fullscreen pada <html> ── */
     function requestFs() {
+        if (isHpDevice) return;
         const el = document.documentElement;
         const fn = el.requestFullscreen
                 || el.webkitRequestFullscreen
@@ -540,6 +546,10 @@
     /* ── Update indikator di topbar ── */
     function updateFsIndicator(aktif) {
         if (!fsIndicator) return;
+        if (isHpDevice) {
+            fsIndicator.style.display = 'none'; // Sembunyikan indikator fullscreen di HP
+            return;
+        }
         if (aktif) {
             fsIndicator.classList.remove('fs-off');
             fsIndicatorTxt.textContent = 'Layar Penuh';
@@ -558,8 +568,9 @@
         if (fsCountdownEl) fsCountdownEl.textContent = '10';
     }
 
-    /* ── Mulai hitungan mundur 10 detik ── */
+    /* ── Mulai hitungan mundur 10 detik (Hanya Laptop, DESIGN §3.7, T5.2) ── */
     function startCountdown() {
+        if (isHpDevice) return;
         stopCountdown();
         fsCountdownVal = 10;
         fsCountdownEl.textContent = fsCountdownVal;
@@ -586,6 +597,7 @@
 
     /* ── Handler saat fullscreenchange ── */
     function onFullscreenChange() {
+        if (isHpDevice) return; // Pada HP, tidak ada event keluar-fullscreen palsu
         const aktif = isFullscreen();
         updateFsIndicator(aktif);
 
@@ -603,11 +615,21 @@
     }
 
     // Pasang listener semua vendor prefix
-    ['fullscreenchange','webkitfullscreenchange','mozfullscreenchange','MSFullscreenChange']
-        .forEach(evt => document.addEventListener(evt, onFullscreenChange));
+    if (!isHpDevice) {
+        ['fullscreenchange','webkitfullscreenchange','mozfullscreenchange','MSFullscreenChange']
+            .forEach(evt => document.addEventListener(evt, onFullscreenChange));
+    }
+
+    /* ── Inisialisasi awal untuk HP vs Laptop ── */
+    if (isHpDevice) {
+        if (fsOverlay) fsOverlay.style.display = 'none';
+        if (fsLostOverlay) fsLostOverlay.style.display = 'none';
+        ujianDimulai = true;
+        updateFsIndicator(true);
+    }
 
     /* ── Tombol "Masuk Layar Penuh & Mulai Ujian" ── */
-    if (btnEnterFs) {
+    if (btnEnterFs && !isHpDevice) {
         // Jika browser tidak support FS, tampilkan info
         if (!fsSupported()) {
             fsNotSupported.style.display = 'block';

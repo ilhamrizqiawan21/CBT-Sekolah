@@ -225,11 +225,22 @@
                     <label class="form-label">Pilih Ujian</label>
                     <div class="input-wrap">
                         <i class="bi bi-journal-check"></i>
-                        <select name="ujian_id" class="form-select" required>
+                        <select name="ujian_id" id="ujian_id" class="form-select" required>
                             <option value="">-- Memuat daftar ujian... --</option>
                         </select>
                     </div>
                 </div>
+
+                <div class="form-group" id="group-token" style="display: none;">
+                    <label class="form-label">Token Ujian <span class="text-danger">*</span></label>
+                    <div class="input-wrap">
+                        <i class="bi bi-shield-lock"></i>
+                        <input type="text" name="token_ujian" id="token_ujian" class="form-control"
+                               placeholder="Masukkan token dari pengawas" autocomplete="off" style="text-transform: uppercase;">
+                    </div>
+                </div>
+
+                <input type="hidden" name="device_type" id="device_type" value="laptop">
 
                 <button type="submit" class="btn-login">
                     <i class="bi bi-box-arrow-in-right"></i>
@@ -239,10 +250,13 @@
         </div>
     </div>
 <script>
+    let daftarUjianCache = [];
+
     fetch('/api/daftar-ujian')
         .then(res => res.json())
         .then(data => {
-            const select = document.querySelector('select[name="ujian_id"]');
+            daftarUjianCache = data;
+            const select = document.getElementById('ujian_id');
             if (data.length === 0) {
                 select.innerHTML = '<option value="">-- Tidak ada ujian aktif --</option>';
                 return;
@@ -254,9 +268,38 @@
             });
         })
         .catch(() => {
-            document.querySelector('select[name="ujian_id"]').innerHTML =
+            document.getElementById('ujian_id').innerHTML =
                 '<option value="">-- Gagal memuat ujian --</option>';
         });
+
+    const selectUjian = document.getElementById('ujian_id');
+    const groupToken = document.getElementById('group-token');
+    const inputToken = document.getElementById('token_ujian');
+
+    selectUjian.addEventListener('change', () => {
+        const selectedId = parseInt(selectUjian.value, 10);
+        const ujian = daftarUjianCache.find(u => u.id === selectedId);
+        if (ujian && ujian.butuh_token) {
+            groupToken.style.display = 'block';
+            inputToken.required = true;
+        } else {
+            groupToken.style.display = 'none';
+            inputToken.required = false;
+            inputToken.value = '';
+        }
+    });
+
+    // Deteksi tipe perangkat klien (DESIGN §3.7, T5.1)
+    // laptop jika pointer halus (mouse/trackpad) DAN layar >= 1024px, selain itu hp
+    (function detectDeviceType() {
+        const hasFinePointer = window.matchMedia && window.matchMedia('(pointer: fine)').matches;
+        const isWideScreen = (window.innerWidth || screen.width) >= 1024;
+        const deviceType = (hasFinePointer && isWideScreen) ? 'laptop' : 'hp';
+        const inputDevice = document.getElementById('device_type');
+        if (inputDevice) {
+            inputDevice.value = deviceType;
+        }
+    })();
 </script>
 </body>
 </html>

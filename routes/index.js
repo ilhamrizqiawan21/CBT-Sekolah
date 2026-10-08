@@ -41,6 +41,7 @@ router.get('/ujian', async (req, res) => {
         `, [req.session.ujianId]);
 
         const ujian = ujianData[0] || {};
+        const deviceType = req.session.deviceType || 'laptop';
 
         res.render('ujian', {
             siswa: {
@@ -49,7 +50,8 @@ router.get('/ujian', async (req, res) => {
                 nis: req.session.siswaNis || req.session.siswaId
             },
             ujianId: req.session.ujianId,
-            ujian: ujian
+            ujian: ujian,
+            deviceType: deviceType
         });
     } catch (err) {
         console.error(err);

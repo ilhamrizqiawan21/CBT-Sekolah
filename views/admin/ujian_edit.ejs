@@ -1,0 +1,92 @@
+<%- include('../partials/header', { title: 'Edit Ujian' }) %>
+<%- include('../partials/sidebar_admin') %>
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2><i class="bi bi-pencil-square"></i> Edit Ujian</h2>
+        <a href="/admin/ujian" class="btn btn-secondary"><i class="bi bi-arrow-left"></i> Kembali</a>
+    </div>
+
+    <% if (typeof error !== 'undefined' && error) { %>
+        <div class="alert alert-danger"><%= error %></div>
+    <% } %>
+
+    <div class="card shadow mb-4">
+        <div class="card-body">
+            <form action="/admin/ujian/edit/<%= ujian.id %>" method="POST">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Pengajaran *</label>
+                        <select name="pengajaran_id" class="form-select" required>
+                            <% pengajaran.forEach(p => { %>
+                                <option value="<%= p.id %>" <%= p.id === ujian.pengajaran_id ? 'selected' : '' %>>
+                                    <%= p.nama_mapel %> - <%= p.nama_kelas %> (<%= p.guru_nama %>)
+                                </option>
+                            <% }) %>
+                        </select>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Nama Ujian *</label>
+                        <input type="text" name="nama_ujian" class="form-control" value="<%= ujian.nama_ujian %>" required>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Durasi (menit) *</label>
+                        <input type="number" name="durasi" class="form-control" value="<%= ujian.durasi %>" required>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Batas Pelanggaran *</label>
+                        <input type="number" name="batas_pelanggaran" class="form-control" value="<%= ujian.batas_pelanggaran %>" min="1" required>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Acak Soal</label>
+                        <select name="acak_soal" class="form-select">
+                            <option value="1" <%= ujian.acak_soal ? 'selected' : '' %>>Ya</option>
+                            <option value="0" <%= !ujian.acak_soal ? 'selected' : '' %>>Tidak</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Acak Pilihan</label>
+                        <select name="acak_pilihan" class="form-select">
+                            <option value="1" <%= ujian.acak_pilihan ? 'selected' : '' %>>Ya</option>
+                            <option value="0" <%= !ujian.acak_pilihan ? 'selected' : '' %>>Tidak</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Tanggal Mulai *</label>
+                        <input type="datetime-local" name="tanggal_mulai" class="form-control"
+                               value="<%= new Date(new Date(ujian.tanggal_mulai).getTime() - new Date().getTimezoneOffset()*60000).toISOString().slice(0,16) %>" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Tanggal Selesai *</label>
+                        <input type="datetime-local" name="tanggal_selesai" class="form-control"
+                               value="<%= new Date(new Date(ujian.tanggal_selesai).getTime() - new Date().getTimezoneOffset()*60000).toISOString().slice(0,16) %>" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Token Ujian (Opsional)</label>
+                        <div class="input-group">
+                            <input type="text" name="token_ujian" id="token_ujian" class="form-control" value="<%= ujian.token_ujian || '' %>" placeholder="Kosongkan jika tanpa token">
+                            <button type="button" class="btn btn-outline-secondary" onclick="generateToken()"><i class="bi bi-shuffle"></i> Acak</button>
+                        </div>
+                        <small class="text-muted">Jika diisi, siswa wajib memasukkan token ini saat login.</small>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
+                <a href="/admin/ujian" class="btn btn-secondary">Batal</a>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function generateToken() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let token = '';
+    for (let i = 0; i < 6; i++) {
+        token += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    document.getElementById('token_ujian').value = token;
+}
+</script>
+
+<%- include('../partials/footer') %>
+

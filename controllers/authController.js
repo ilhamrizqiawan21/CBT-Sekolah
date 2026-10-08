@@ -35,7 +35,7 @@ exports.loginSiswa = async (req, res) => {
 
         // ── Validasi kelas siswa = kelas pengajaran ujian (join ujian → pengajaran → kelas) ──
         const [ujianRows] = await pool.query(
-            `SELECT u.id, k.nama_kelas
+            `SELECT u.id, u.token_ujian, k.nama_kelas
              FROM ujian u
              JOIN pengajaran p ON u.pengajaran_id = p.id
              JOIN kelas k ON p.kelas_id = k.id
@@ -50,6 +50,18 @@ exports.loginSiswa = async (req, res) => {
             return res.render('login', { error: 'Ujian ini tidak diperuntukkan bagi kelas Anda' });
         }
 
+        // ── Validasi Token Ujian jika diset (DESIGN §3.1, §3.7, T5.3) ──
+        const requiredToken = ujianRows[0].token_ujian ? ujianRows[0].token_ujian.trim() : null;
+        if (requiredToken && requiredToken !== '') {
+            const inputToken = (req.body.token_ujian || '').trim();
+            if (!inputToken) {
+                return res.render('login', { error: 'Token ujian wajib diisi untuk ujian ini' });
+            }
+            if (inputToken.toUpperCase() !== requiredToken.toUpperCase()) {
+                return res.render('login', { error: 'Token ujian salah. Silakan minta token yang benar ke pengawas' });
+            }
+        }
+
         // ── Cek apakah sudah pernah mengerjakan ujian ini ──
         const [nilai] = await pool.query(
             `SELECT id FROM nilai_ujian
@@ -60,9 +72,10 @@ exports.loginSiswa = async (req, res) => {
             return res.render('login', { error: 'Anda sudah mengerjakan ujian ini sebelumnya!' });
         }
 
-        // ── Ambil atau buat sesi ujian (Take-over jika sedang aktif, DESIGN §3.1) ──
+        // ── Ambil atau buat sesi ujian (Take-over jika sedang aktif, DESIGN §3.1, §3.7) ──
         const sesiService = require('../services/sesiService');
-        const deviceType = req.body.device_type || null;
+        const rawDevice = (req.body.device_type || '').trim().toLowerCase();
+        const deviceType = (rawDevice === 'hp' || rawDevice === 'laptop') ? rawDevice : 'laptop';
         const hasilSesi = await sesiService.mulaiAtauLanjut(siswaData.id, parseInt(ujian_id), deviceType, pool);
 
         if (hasilSesi.status === 'keluar_paksa') {
@@ -79,11 +92,11 @@ exports.loginSiswa = async (req, res) => {
         // Jika sesi diambil alih (take-over), catat ke log_kecurangan
         if (hasilSesi.status === 'lanjut' && hasilSesi.takeOver) {
             await pool.query(
-                `INSERT INTO log_kecurangan (siswa_id, ujian_id, jenis_kecurangan)
-                 VALUES (?, ?, 'ambil_alih_sesi')`,
-                [siswaData.id, parseInt(ujian_id)]
+                `INSERT INTO log_kecurangan (siswa_id, ujian_id, jenis_kecurangan, device_type)
+                 VALUES (?, ?, 'ambil_alih_sesi', ?)`,
+                [siswaData.id, parseInt(ujian_id), deviceType]
             );
-            logger.info(`Sesi siswa NIS ${siswaData.nis} untuk ujian ID ${ujian_id} diambil alih`);
+            logger.info(`Sesi siswa NIS ${siswaData.nis} untuk ujian ID ${ujian_id} diambil alih (${deviceType})`);
         }
 
         // ── Simpan session ──
@@ -92,6 +105,7 @@ exports.loginSiswa = async (req, res) => {
         req.session.ujianId     = parseInt(ujian_id);
         req.session.siswaNis    = siswaData.nis;
         req.session.deviceToken = hasilSesi.sesi.device_token;
+        req.session.deviceType  = deviceType;
 
         req.session.save(err => {
             if (err) logger.error(`Session save error: ${err.message}`);

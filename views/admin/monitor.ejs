@@ -1,0 +1,525 @@
+<%- include('../partials/header', { title: 'Pemantauan Ujian: ' + ujian.nama_ujian }) %>
+<%- include('../partials/sidebar_admin') %>
+
+<div class="container-fluid py-4">
+    <!-- Header Page -->
+    <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between mb-4 gap-3">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-1">
+                    <li class="breadcrumb-item"><a href="/admin/ujian">Ujian</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Pemantauan</li>
+                </ol>
+            </nav>
+            <h1 class="h3 mb-0 text-gray-800 fw-bold">
+                <i class="bi bi-display me-2 text-primary"></i><%= ujian.nama_ujian %>
+                <span class="badge bg-primary fs-6 align-middle ms-2"><%= ujian.nama_kelas %></span>
+            </h1>
+            <p class="text-muted small mb-0 mt-1">
+                Mapel: <strong><%= ujian.nama_mapel %></strong> | Durasi: <strong><%= ujian.durasi %> menit</strong> | Total Soal: <strong><%= total_soal %> butir</strong>
+            </p>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+            <span id="socket-status" class="badge bg-secondary p-2 d-flex align-items-center gap-1">
+                <span class="spinner-grow spinner-grow-sm" role="status" aria-hidden="true" style="width: 0.65rem; height: 0.65rem;"></span>
+                Menghubungkan...
+            </span>
+
+            <% if (ujianList && ujianList.length > 1) { %>
+            <select class="form-select form-select-sm" style="max-width: 200px;" onchange="if(this.value) window.location.href='/admin/monitor/' + this.value">
+                <% ujianList.forEach(u => { %>
+                    <option value="<%= u.id %>" <%= u.id === ujian.id ? 'selected' : '' %>>
+                        <%= u.nama_ujian %> (<%= u.nama_kelas %>)
+                    </option>
+                <% }) %>
+            </select>
+            <% } %>
+
+            <button class="btn btn-sm btn-outline-primary" onclick="window.location.reload()">
+                <i class="bi bi-arrow-clockwise"></i> Segarkan
+            </button>
+        </div>
+    </div>
+
+    <!-- Ringkasan Statistik -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-2">
+            <div class="card shadow-sm border-0 border-start border-4 border-dark h-100">
+                <div class="card-body p-3 text-center">
+                    <div class="text-xs text-uppercase fw-bold text-muted mb-1">Total Siswa</div>
+                    <div class="h4 mb-0 fw-bold text-dark" id="count-total"><%= ringkasan.total_siswa %></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-2">
+            <div class="card shadow-sm border-0 border-start border-4 border-success h-100">
+                <div class="card-body p-3 text-center">
+                    <div class="text-xs text-uppercase fw-bold text-success mb-1">Online</div>
+                    <div class="h4 mb-0 fw-bold text-success" id="count-online"><%= ringkasan.online %></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-2">
+            <div class="card shadow-sm border-0 border-start border-4 border-warning h-100">
+                <div class="card-body p-3 text-center">
+                    <div class="text-xs text-uppercase fw-bold text-warning mb-1">Offline</div>
+                    <div class="h4 mb-0 fw-bold text-warning" id="count-offline"><%= ringkasan.offline %></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-2">
+            <div class="card shadow-sm border-0 border-start border-4 border-info h-100">
+                <div class="card-body p-3 text-center">
+                    <div class="text-xs text-uppercase fw-bold text-info mb-1">Selesai</div>
+                    <div class="h4 mb-0 fw-bold text-info" id="count-selesai"><%= ringkasan.selesai %></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-2">
+            <div class="card shadow-sm border-0 border-start border-4 border-danger h-100">
+                <div class="card-body p-3 text-center">
+                    <div class="text-xs text-uppercase fw-bold text-danger mb-1">Terkunci</div>
+                    <div class="h4 mb-0 fw-bold text-danger" id="count-terkunci"><%= ringkasan.terkunci %></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-2">
+            <div class="card shadow-sm border-0 border-start border-4 border-secondary h-100">
+                <div class="card-body p-3 text-center">
+                    <div class="text-xs text-uppercase fw-bold text-secondary mb-1">Belum Masuk</div>
+                    <div class="h4 mb-0 fw-bold text-secondary" id="count-belum_masuk"><%= ringkasan.belum_masuk %></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter & Pencarian -->
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body py-3">
+            <div class="row g-2 align-items-center">
+                <div class="col-md-5">
+                    <div class="input-group">
+                        <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                        <input type="text" id="filter-search" class="form-control border-start-0" placeholder="Cari nama atau NIS siswa...">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="d-flex align-items-center gap-2">
+                        <label class="form-label mb-0 text-nowrap small text-muted">Filter Status:</label>
+                        <select id="filter-status" class="form-select form-select-sm">
+                            <option value="">Semua Status</option>
+                            <option value="online">Online</option>
+                            <option value="offline">Offline</option>
+                            <option value="selesai">Selesai</option>
+                            <option value="terkunci">Terkunci</option>
+                            <option value="belum_masuk">Belum Masuk</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-3 text-md-end text-muted small">
+                    Menampilkan <strong id="visible-count"><%= siswa.length %></strong> dari <strong><%= siswa.length %></strong> siswa
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabel Daftar Siswa -->
+    <div class="card shadow-sm border-0">
+        <div class="table-responsive" style="max-height: 680px; overflow-y: auto;">
+            <table class="table table-hover align-middle mb-0" id="table-monitor">
+                <thead class="table-light sticky-top" style="z-index: 10;">
+                    <tr>
+                        <th style="width: 50px;">No</th>
+                        <th style="width: 120px;">NIS</th>
+                        <th>Nama Siswa</th>
+                        <th style="width: 140px;">Status</th>
+                        <th style="width: 200px;">Progres</th>
+                        <th style="width: 110px;">Pelanggaran</th>
+                        <th style="width: 120px;">Perangkat</th>
+                        <th style="width: 160px;">Terakhir Aktif</th>
+                        <th style="width: 120px;" class="text-end">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody-monitor">
+                    <% if (siswa && siswa.length > 0) { %>
+                        <% siswa.forEach((s, idx) => { %>
+                            <tr id="row-siswa-<%= s.id %>"
+                                data-id="<%= s.id %>"
+                                data-nis="<%= s.nis %>"
+                                data-nama="<%= s.nama.toLowerCase() %>"
+                                data-nama-asli="<%= s.nama %>"
+                                data-status="<%= s.status %>"
+                                data-sesi-id="<%= s.sesi_id || '' %>">
+                                <td><%= idx + 1 %></td>
+                                <td><code><%= s.nis %></code></td>
+                                <td class="fw-semibold text-dark"><%= s.nama %></td>
+                                <td class="col-status">
+                                    <% if (s.status === 'online') { %>
+                                        <span class="badge bg-success"><i class="bi bi-circle-fill me-1" style="font-size:0.5rem;"></i>Online</span>
+                                    <% } else if (s.status === 'offline') { %>
+                                        <span class="badge bg-warning text-dark"><i class="bi bi-pause-circle me-1"></i>Offline</span>
+                                    <% } else if (s.status === 'selesai') { %>
+                                        <span class="badge bg-info"><i class="bi bi-check-circle me-1"></i>Selesai</span>
+                                    <% } else if (s.status === 'terkunci') { %>
+                                        <span class="badge bg-danger"><i class="bi bi-lock-fill me-1"></i>Terkunci</span>
+                                    <% } else { %>
+                                        <span class="badge bg-secondary"><i class="bi bi-dash-circle me-1"></i>Belum Masuk</span>
+                                    <% } %>
+                                </td>
+                                <td class="col-progres">
+                                    <% const persen = total_soal > 0 ? Math.round((s.progres.terjawab / total_soal) * 100) : 0; %>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="progress flex-grow-1" style="height: 6px;">
+                                            <div class="progress-bar <%= s.status === 'selesai' ? 'bg-info' : 'bg-primary' %>"
+                                                 role="progressbar"
+                                                 style="width: <%= persen %>%;"
+                                                 aria-valuenow="<%= persen %>" aria-valuemin="0" aria-valuemax="100"></div>
+                                        </div>
+                                        <span class="small text-muted text-nowrap"><%= s.progres.terjawab %>/<%= total_soal %></span>
+                                    </div>
+                                </td>
+                                <td class="col-pelanggaran">
+                                    <% if (s.pelanggaran > 0) { %>
+                                        <span class="badge bg-danger rounded-pill"><%= s.pelanggaran %>x</span>
+                                    <% } else { %>
+                                        <span class="badge bg-light text-muted border">0</span>
+                                    <% } %>
+                                </td>
+                                <td class="col-perangkat">
+                                    <% if (s.perangkat === 'laptop') { %>
+                                        <span class="text-secondary small"><i class="bi bi-laptop me-1"></i>Laptop</span>
+                                    <% } else if (s.perangkat === 'hp') { %>
+                                        <span class="text-secondary small"><i class="bi bi-phone me-1"></i>HP</span>
+                                    <% } else { %>
+                                        <span class="text-muted small">-</span>
+                                    <% } %>
+                                </td>
+                                <td class="col-last-seen small text-muted">
+                                    <%= s.last_seen ? new Date(s.last_seen).toLocaleTimeString() : '-' %>
+                                </td>
+                                <td class="text-end col-aksi">
+                                    <div class="d-inline-flex gap-1 justify-content-end">
+                                    <% if (s.sesi_id && s.status !== 'selesai') { %>
+                                        <button class="btn btn-sm btn-outline-primary btn-tambah-waktu" title="Tambah Waktu" data-aksi="tambah-waktu">
+                                            <i class="bi bi-clock-history"></i> +Waktu
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-warning btn-paksa-selesai" title="Paksa Selesai" data-aksi="paksa-selesai">
+                                            <i class="bi bi-stop-circle"></i> Selesai
+                                        </button>
+                                    <% } %>
+                                    <% if (s.status === 'terkunci' && s.sesi_id) { %>
+                                        <button class="btn btn-sm btn-outline-danger btn-buka-kunci" title="Buka Kunci" data-aksi="buka-kunci">
+                                            <i class="bi bi-unlock"></i> Buka
+                                        </button>
+                                    <% } %>
+                                    </div>
+                                </td>
+                            </tr>
+                        <% }) %>
+                    <% } else { %>
+                        <tr>
+                            <td colspan="9" class="text-center py-4 text-muted">Belum ada siswa di kelas ujian ini.</td>
+                        </tr>
+                    <% } %>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    const UJIAN_ID = <%= ujian.id %>;
+    const TOTAL_SOAL = <%= total_soal %>;
+    const socket = io();
+
+    const socketStatusEl = document.getElementById('socket-status');
+    const filterSearchEl = document.getElementById('filter-search');
+    const filterStatusEl = document.getElementById('filter-status');
+    const visibleCountEl = document.getElementById('visible-count');
+
+    // ── 1. Koneksi Socket dan Join Room Admin (DESIGN §3.6, T4.2) ──
+    socket.on('connect', () => {
+        socketStatusEl.className = 'badge bg-success p-2 d-flex align-items-center gap-1';
+        socketStatusEl.innerHTML = '<i class="bi bi-broadcast"></i> Terhubung Real-time';
+        socket.emit('admin:join', { ujian_id: UJIAN_ID });
+    });
+
+    socket.on('disconnect', () => {
+        socketStatusEl.className = 'badge bg-danger p-2 d-flex align-items-center gap-1';
+        socketStatusEl.innerHTML = '<i class="bi bi-exclamation-triangle"></i> Terputus';
+    });
+
+    socket.on('admin:error', (err) => {
+        console.error('Socket admin error:', err);
+        socketStatusEl.className = 'badge bg-danger p-2 d-flex align-items-center gap-1';
+        socketStatusEl.innerHTML = '<i class="bi bi-x-circle"></i> Akses Ditolak';
+    });
+
+    // ── 2. Update Real-time (T4.2 & T4.3: Render Efisien O(1) per Baris) ──
+    socket.on('monitor:update', (data) => {
+        if (!data || data.ujian_id !== UJIAN_ID) return;
+        updateRowSiswa(data);
+        hitungUlangStatistik();
+    });
+
+    function updateRowSiswa(data) {
+        const row = document.getElementById('row-siswa-' + data.siswa_id);
+        if (!row) return;
+
+        // Update dataset status & sesi
+        row.dataset.status = data.status;
+        if (data.sesi_id) row.dataset.sesiId = data.sesi_id;
+
+        // 1. Kolom Status
+        const colStatus = row.querySelector('.col-status');
+        if (colStatus) {
+            let badgeHtml = '';
+            switch (data.status) {
+                case 'online':
+                    badgeHtml = '<span class="badge bg-success"><i class="bi bi-circle-fill me-1" style="font-size:0.5rem;"></i>Online</span>';
+                    break;
+                case 'offline':
+                    badgeHtml = '<span class="badge bg-warning text-dark"><i class="bi bi-pause-circle me-1"></i>Offline</span>';
+                    break;
+                case 'selesai':
+                    badgeHtml = '<span class="badge bg-info"><i class="bi bi-check-circle me-1"></i>Selesai</span>';
+                    break;
+                case 'terkunci':
+                    badgeHtml = '<span class="badge bg-danger"><i class="bi bi-lock-fill me-1"></i>Terkunci</span>';
+                    break;
+                default:
+                    badgeHtml = '<span class="badge bg-secondary"><i class="bi bi-dash-circle me-1"></i>Belum Masuk</span>';
+                    break;
+            }
+            colStatus.innerHTML = badgeHtml;
+        }
+
+        // 2. Kolom Progres
+        if (data.progres) {
+            const colProgres = row.querySelector('.col-progres');
+            if (colProgres) {
+                const terjawab = data.progres.terjawab || 0;
+                const total = data.progres.total || TOTAL_SOAL;
+                const persen = total > 0 ? Math.round((terjawab / total) * 100) : 0;
+                const barColor = data.status === 'selesai' ? 'bg-info' : 'bg-primary';
+
+                colProgres.innerHTML = `
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="progress flex-grow-1" style="height: 6px;">
+                            <div class="progress-bar ${barColor}"
+                                 role="progressbar"
+                                 style="width: ${persen}%;"
+                                 aria-valuenow="${persen}" aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
+                        <span class="small text-muted text-nowrap">${terjawab}/${total}</span>
+                    </div>
+                `;
+            }
+        }
+
+        // 3. Kolom Pelanggaran
+        if (data.pelanggaran !== undefined) {
+            const colPelanggaran = row.querySelector('.col-pelanggaran');
+            if (colPelanggaran) {
+                colPelanggaran.innerHTML = data.pelanggaran > 0
+                    ? `<span class="badge bg-danger rounded-pill">${data.pelanggaran}x</span>`
+                    : '<span class="badge bg-light text-muted border">0</span>';
+            }
+        }
+
+        // 4. Kolom Perangkat
+        if (data.perangkat !== undefined) {
+            const colPerangkat = row.querySelector('.col-perangkat');
+            if (colPerangkat) {
+                if (data.perangkat === 'laptop') {
+                    colPerangkat.innerHTML = '<span class="text-secondary small"><i class="bi bi-laptop me-1"></i>Laptop</span>';
+                } else if (data.perangkat === 'hp') {
+                    colPerangkat.innerHTML = '<span class="text-secondary small"><i class="bi bi-phone me-1"></i>HP</span>';
+                } else {
+                    colPerangkat.innerHTML = '<span class="text-muted small">-</span>';
+                }
+            }
+        }
+
+        // 5. Kolom Last Seen
+        if (data.last_seen) {
+            const colLastSeen = row.querySelector('.col-last-seen');
+            if (colLastSeen) {
+                colLastSeen.textContent = new Date(data.last_seen).toLocaleTimeString();
+            }
+        }
+
+        // 6. Kolom Aksi
+        const colAksi = row.querySelector('.col-aksi');
+        if (colAksi) {
+            let aksiHtml = '<div class="d-inline-flex gap-1 justify-content-end">';
+            if (data.sesi_id && data.status !== 'selesai') {
+                aksiHtml += `
+                    <button class="btn btn-sm btn-outline-primary btn-tambah-waktu" title="Tambah Waktu" data-aksi="tambah-waktu">
+                        <i class="bi bi-clock-history"></i> +Waktu
+                    </button>
+                    <button class="btn btn-sm btn-outline-warning btn-paksa-selesai" title="Paksa Selesai" data-aksi="paksa-selesai">
+                        <i class="bi bi-stop-circle"></i> Selesai
+                    </button>
+                `;
+            }
+            if (data.status === 'terkunci' && data.sesi_id) {
+                aksiHtml += `
+                    <button class="btn btn-sm btn-outline-danger btn-buka-kunci" title="Buka Kunci" data-aksi="buka-kunci">
+                        <i class="bi bi-unlock"></i> Buka
+                    </button>
+                `;
+            }
+            aksiHtml += '</div>';
+            colAksi.innerHTML = aksiHtml;
+        }
+
+        // Terapkan kembali filter jika sedang aktif
+        applyFilter();
+    }
+
+    // ── 3. Aksi Admin (T1.9 & T4.4) ──
+    async function bukaKunciSiswa(sesiId, namaSiswa) {
+        if (!confirm(`Buka kunci sesi ujian untuk ${namaSiswa}?`)) return;
+
+        try {
+            const res = await fetch(`/admin/api/sesi/${sesiId}/buka-kunci`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                alert(data.error || 'Gagal membuka kunci sesi');
+            }
+        } catch (err) {
+            alert('Terjadi kesalahan jaringan saat membuka kunci');
+        }
+    }
+
+    async function tambahWaktuSiswa(sesiId, namaSiswa) {
+        const input = prompt(`Tambah waktu untuk ${namaSiswa} (dalam menit):`, '10');
+        if (!input) return;
+        const menit = parseInt(input, 10);
+        if (isNaN(menit) || menit <= 0 || menit > 180) {
+            alert('Jumlah menit harus berupa angka antara 1 sampai 180');
+            return;
+        }
+
+        try {
+            const res = await fetch(`/admin/api/sesi/${sesiId}/tambah-waktu`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ menit })
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                alert(data.error || 'Gagal menambah waktu ujian');
+            }
+        } catch (err) {
+            alert('Terjadi kesalahan jaringan saat menambah waktu');
+        }
+    }
+
+    async function paksaSelesaiSiswa(sesiId, namaSiswa) {
+        if (!confirm(`Yakin ingin memaksa selesai ujian untuk ${namaSiswa}?\nJawaban saat ini akan dinilai dan sesi akan diakhiri.`)) return;
+
+        try {
+            const res = await fetch(`/admin/api/sesi/${sesiId}/paksa-selesai`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                alert(data.error || 'Gagal memaksa selesai ujian');
+            }
+        } catch (err) {
+            alert('Terjadi kesalahan jaringan saat mengakhiri sesi');
+        }
+    }
+
+    // Delegasi klik tombol aksi (nama diambil dari atribut data, bukan disisipkan ke JS)
+    document.getElementById('tbody-monitor').addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-aksi]');
+        if (!btn) return;
+        const row = btn.closest('tr');
+        const sesiId = parseInt(row.dataset.sesiId, 10);
+        const nama = row.dataset.namaAsli || 'Siswa';
+        if (!sesiId) return;
+        if (btn.dataset.aksi === 'tambah-waktu') tambahWaktuSiswa(sesiId, nama);
+        else if (btn.dataset.aksi === 'paksa-selesai') paksaSelesaiSiswa(sesiId, nama);
+        else if (btn.dataset.aksi === 'buka-kunci') bukaKunciSiswa(sesiId, nama);
+    });
+
+    // ── Polling snapshot: menurunkan status offline dari last_seen (heartbeat tidak disiarkan) ──
+    async function segarkanSnapshot() {
+        try {
+            const res = await fetch(`/admin/api/monitor/${UJIAN_ID}`, { headers: { Accept: 'application/json' } });
+            if (!res.ok) return;
+            const snap = await res.json();
+            (snap.siswa || []).forEach(s => {
+                const row = document.getElementById('row-siswa-' + s.id);
+                if (!row) return;
+                const p = s.progres || {};
+                const sig = [s.status, p.terjawab, s.pelanggaran, s.perangkat, s.sesi_id, s.last_seen].join('|');
+                if (row.dataset.sig === sig) return;
+                row.dataset.sig = sig;
+                updateRowSiswa({
+                    siswa_id: s.id, status: s.status, sesi_id: s.sesi_id, progres: s.progres,
+                    pelanggaran: s.pelanggaran, perangkat: s.perangkat, last_seen: s.last_seen
+                });
+            });
+            hitungUlangStatistik();
+        } catch (_) { /* jaringan putus: coba lagi pada siklus berikutnya */ }
+    }
+    setInterval(segarkanSnapshot, 10000);
+
+    // ── 4. Hitung Ringkas Statistik Dinamis ──
+    function hitungUlangStatistik() {
+        const counts = { online: 0, offline: 0, selesai: 0, terkunci: 0, belum_masuk: 0 };
+        const rows = document.querySelectorAll('#tbody-monitor tr[data-status]');
+        rows.forEach(r => {
+            const st = r.dataset.status;
+            if (counts[st] !== undefined) counts[st]++;
+        });
+
+        document.getElementById('count-total').textContent = rows.length;
+        document.getElementById('count-online').textContent = counts.online;
+        document.getElementById('count-offline').textContent = counts.offline;
+        document.getElementById('count-selesai').textContent = counts.selesai;
+        document.getElementById('count-terkunci').textContent = counts.terkunci;
+        document.getElementById('count-belum_masuk').textContent = counts.belum_masuk;
+    }
+
+    // ── 5. Client-Side Filter Cepat (Tahan 410 baris tanpa lag) ──
+    function applyFilter() {
+        const query = filterSearchEl.value.trim().toLowerCase();
+        const selectedStatus = filterStatusEl.value;
+        const rows = document.querySelectorAll('#tbody-monitor tr[data-status]');
+        let visible = 0;
+
+        rows.forEach(r => {
+            const nis = r.dataset.nis.toLowerCase();
+            const nama = r.dataset.nama;
+            const status = r.dataset.status;
+
+            const matchQuery = !query || nis.includes(query) || nama.includes(query);
+            const matchStatus = !selectedStatus || status === selectedStatus;
+
+            if (matchQuery && matchStatus) {
+                r.style.display = '';
+                visible++;
+            } else {
+                r.style.display = 'none';
+            }
+        });
+
+        visibleCountEl.textContent = visible;
+    }
+
+    filterSearchEl.addEventListener('input', applyFilter);
+    filterStatusEl.addEventListener('change', applyFilter);
+</script>
+
+<%- include('../partials/footer') %>

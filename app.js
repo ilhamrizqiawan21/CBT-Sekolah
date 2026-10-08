@@ -5,6 +5,7 @@ const path       = require('path');
 const http       = require('http');
 const socketIo   = require('socket.io');
 const pool       = require('./models/db');
+const monitorService = require('./services/monitorService');
 require('dotenv').config();
 
 const app    = express();
@@ -42,7 +43,7 @@ const sessionStore = new MySQLStore({
     createDatabaseTable: true
 }, pool);
 
-app.use(session({
+const sessionMiddleware = session({
     secret:            process.env.SESSION_SECRET,
     store:             sessionStore,
     resave:            false,
@@ -53,7 +54,11 @@ app.use(session({
         secure:   process.env.NODE_ENV === 'production',
         maxAge:   1000 * 60 * 60 * 24
     }
-}));
+});
+
+app.use(sessionMiddleware);
+io.engine.use(sessionMiddleware);
+app.set('io', io);
 
 app.set('views',       path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
@@ -122,16 +127,33 @@ async function cekDanPaksaSubmit(pool, socket, siswa_id, ujian_id, jenisKecurang
 io.on('connection', (socket) => {
     console.log('Socket connected:', socket.id);
 
+    // ── admin:join (DESIGN §3.6, T4.2) ──
+    socket.on('admin:join', ({ ujian_id }) => {
+        const session = socket.request.session;
+        if (!session || !session.adminId) {
+            socket.emit('admin:error', {
+                message: 'Akses ditolak: Hanya admin yang diizinkan bergabung ke pemantauan',
+                code: 403
+            });
+            return;
+        }
+
+        const room = `admin:${ujian_id}`;
+        socket.join(room);
+        socket.emit('admin:joined', { ujian_id, room });
+    });
+
     // ── siswa-siap ──
-    socket.on('siswa-siap', async ({ ujian_id, siswa_id }) => {
-        console.log('siswa-siap: ujian_id=%s siswa_id=%s', ujian_id, siswa_id);
+    socket.on('siswa-siap', async ({ ujian_id, siswa_id, device_type }) => {
+        console.log('siswa-siap: ujian_id=%s siswa_id=%s device_type=%s', ujian_id, siswa_id, device_type);
 
         if (!siswa_id || !ujian_id) {
             socket.emit('error', { message: 'Data siswa tidak valid' });
             return;
         }
 
-        sessionSocketMap.set(socket.id, { siswa_id, ujian_id });
+        const validDeviceType = (device_type === 'hp' || device_type === 'laptop') ? device_type : null;
+        sessionSocketMap.set(socket.id, { siswa_id, ujian_id, device_type: validDeviceType });
 
         const pool = require('./models/db');
         try {
@@ -165,26 +187,32 @@ io.on('connection', (socket) => {
 
             let sesi;
             if (sesiRows.length === 0) {
-                const hasil = await sesiService.mulaiAtauLanjut(siswa_id, ujian_id, null, pool);
+                const hasil = await sesiService.mulaiAtauLanjut(siswa_id, ujian_id, validDeviceType, pool);
                 sesi = hasil.sesi;
             } else {
                 sesi = sesiRows[0];
             }
 
-            // Update socket_id dan last_seen tanpa mereset status atau waktu_mulai
+            // Update socket_id, last_seen, dan device_type (jika ada) tanpa mereset status atau waktu_mulai
             await pool.query(
                 `UPDATE sesi_ujian
-                 SET socket_id = ?, last_seen = NOW()
+                 SET socket_id = ?,
+                     device_type = COALESCE(?, device_type),
+                     last_seen = NOW()
                  WHERE id = ?`,
-                [socket.id, sesi.id]
+                [socket.id, validDeviceType, sesi.id]
             );
 
             const sisa_detik = sesiService.hitungSisaDetik(sesi, new Date());
             socket.emit('mulai-ujian', {
                 durasi: sesi.durasi,
                 sisa_detik,
-                batas_waktu: sesi.batas_waktu
+                batas_waktu: sesi.batas_waktu,
+                device_type: validDeviceType || sesi.device_type || 'laptop'
             });
+
+            // Siarkan ke dashboard monitor admin
+            await monitorService.siarkanUpdateSiswa(io, ujian_id, siswa_id, pool, { event: 'masuk' });
 
         } catch (err) {
             console.error('siswa-siap error:', err);
@@ -196,21 +224,23 @@ io.on('connection', (socket) => {
     // FIX #4 — Handler ini sekarang tetap mencatat ke DB bahkan saat
     //           socket reconnect, karena validasi pakai DB bukan Map.
     // FIX #5 — Menggunakan cekDanPaksaSubmit() yang hitung total gabungan.
+    // T5.1 — Simpan device_type di log_kecurangan
     socket.on('pindah-tab', async () => {
         console.log('pindah-tab dari socket:', socket.id);
         const data = sessionSocketMap.get(socket.id);
         if (!data) return;
-        const { siswa_id, ujian_id } = data;
+        const { siswa_id, ujian_id, device_type } = data;
         if (!siswa_id) return;
 
         const pool = require('./models/db');
         try {
             await pool.query(
-                `INSERT INTO log_kecurangan (siswa_id, ujian_id, jenis_kecurangan)
-                 VALUES (?, ?, 'pindah_tab')`,
-                [siswa_id, ujian_id]
+                `INSERT INTO log_kecurangan (siswa_id, ujian_id, jenis_kecurangan, device_type)
+                 VALUES (?, ?, 'pindah_tab', ?)`,
+                [siswa_id, ujian_id, device_type || null]
             );
             await cekDanPaksaSubmit(pool, socket, siswa_id, ujian_id, 'pindah_tab');
+            await monitorService.siarkanUpdateSiswa(io, ujian_id, siswa_id, pool, { event: 'pelanggaran' });
         } catch (err) {
             console.error('pindah-tab error:', err);
         }
@@ -219,21 +249,23 @@ io.on('connection', (socket) => {
     // ── copy-paste ──
     // FIX #5 — Sebelumnya sudah hitung total, sekarang pakai helper
     //           yang sama agar konsisten dengan pindah-tab.
+    // T5.1 — Simpan device_type di log_kecurangan
     socket.on('copy-paste', async () => {
         console.log('copy-paste dari socket:', socket.id);
         const data = sessionSocketMap.get(socket.id);
         if (!data) return;
-        const { siswa_id, ujian_id } = data;
+        const { siswa_id, ujian_id, device_type } = data;
         if (!siswa_id) return;
 
         const pool = require('./models/db');
         try {
             await pool.query(
-                `INSERT INTO log_kecurangan (siswa_id, ujian_id, jenis_kecurangan)
-                 VALUES (?, ?, 'copy_paste')`,
-                [siswa_id, ujian_id]
+                `INSERT INTO log_kecurangan (siswa_id, ujian_id, jenis_kecurangan, device_type)
+                 VALUES (?, ?, 'copy_paste', ?)`,
+                [siswa_id, ujian_id, device_type || null]
             );
             await cekDanPaksaSubmit(pool, socket, siswa_id, ujian_id, 'copy_paste');
+            await monitorService.siarkanUpdateSiswa(io, ujian_id, siswa_id, pool, { event: 'pelanggaran' });
         } catch (err) {
             console.error('copy-paste error:', err);
         }
@@ -243,21 +275,29 @@ io.on('connection', (socket) => {
     // FIX #8 — Dicatat sebagai pelanggaran tersendiri.
     // Dihitung ke total gabungan via cekDanPaksaSubmit()
     // sama seperti pindah_tab dan copy_paste.
+    // T5.1 & T5.2 — Hanya dihitung untuk Laptop; HP tidak mewajibkan fullscreen
     socket.on('keluar-fullscreen', async () => {
         console.log('keluar-fullscreen dari socket:', socket.id);
         const data = sessionSocketMap.get(socket.id);
         if (!data) return;
-        const { siswa_id, ujian_id } = data;
+        const { siswa_id, ujian_id, device_type } = data;
         if (!siswa_id) return;
+
+        // Jika HP: abaikan event keluar-fullscreen palsu
+        if (device_type === 'hp') {
+            console.log('keluar-fullscreen diabaikan untuk perangkat hp:', socket.id);
+            return;
+        }
 
         const pool = require('./models/db');
         try {
             await pool.query(
-                `INSERT INTO log_kecurangan (siswa_id, ujian_id, jenis_kecurangan)
-                 VALUES (?, ?, 'keluar_fullscreen')`,
-                [siswa_id, ujian_id]
+                `INSERT INTO log_kecurangan (siswa_id, ujian_id, jenis_kecurangan, device_type)
+                 VALUES (?, ?, 'keluar_fullscreen', ?)`,
+                [siswa_id, ujian_id, device_type || null]
             );
             await cekDanPaksaSubmit(pool, socket, siswa_id, ujian_id, 'keluar_fullscreen');
+            await monitorService.siarkanUpdateSiswa(io, ujian_id, siswa_id, pool, { event: 'pelanggaran' });
         } catch (err) {
             console.error('keluar-fullscreen error:', err);
         }
@@ -278,6 +318,7 @@ io.on('connection', (socket) => {
                      WHERE siswa_id = ? AND ujian_id = ?`,
                     [siswa_id, ujian_id]
                 );
+                await monitorService.siarkanUpdateSiswa(io, ujian_id, siswa_id, pool, { event: 'selesai' });
             } catch (err) {
                 console.error('selesai-ujian update sesi error:', err);
             }
@@ -297,6 +338,7 @@ io.on('connection', (socket) => {
                     'UPDATE sesi_ujian SET last_seen = NOW() WHERE siswa_id = ? AND ujian_id = ?',
                     [data.siswa_id, data.ujian_id]
                 );
+                await monitorService.siarkanUpdateSiswa(io, data.ujian_id, data.siswa_id, pool, { event: 'disconnect' });
             } catch (err) {
                 console.error('disconnect last_seen update error:', err);
             }

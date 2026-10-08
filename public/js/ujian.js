@@ -603,7 +603,8 @@ async function selesaiUjian() {
 // ── Socket Events ──
 socket.on('connect', () => {
     console.log('Socket connected:', socket.id);
-    socket.emit('siswa-siap', { ujian_id: ujianId, siswa_id: siswaId });
+    const devType = window.deviceType || 'laptop';
+    socket.emit('siswa-siap', { ujian_id: ujianId, siswa_id: siswaId, device_type: devType });
 });
 
 socket.on('mulai-ujian', ({ durasi, sisa_detik }) => {
@@ -615,9 +616,15 @@ socket.on('mulai-ujian', ({ durasi, sisa_detik }) => {
     startResyncTimer();
 });
 
-socket.on('paksa-submit', () => {
-    showWarning('⚠️ Anda telah melanggar aturan! Ujian akan diakhiri.');
+socket.on('paksa-submit', (data) => {
+    showWarning((data && data.message) || '⚠️ Anda telah melanggar aturan! Ujian akan diakhiri.');
     setTimeout(() => selesaiUjian(), 1000);
+});
+
+// Admin menambah waktu: tampilkan pesan dan sinkronkan timer segera
+socket.on('tambah-waktu', (data) => {
+    if (data && data.pesan) showWarning(data.pesan);
+    resinkronTimer();
 });
 
 socket.on('peringatan', ({ pesan }) => showWarning(pesan));

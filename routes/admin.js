@@ -3,6 +3,7 @@ const router  = express.Router();
 const pool    = require('../models/db');
 const { isAdmin } = require('../middleware/auth');
 const bcrypt  = require('bcrypt');
+const monitorService = require('../services/monitorService');
 
 router.use(isAdmin);
 
@@ -126,11 +127,12 @@ router.get('/ujian', async (req, res) => {
     res.render('admin/ujian', { ujian, pengajaran, mapelList, kelasList, filterMapel, filterKelas, currentPage: page, totalPages, total, msg: req.query.msg, error: req.query.error });
 });
 router.post('/ujian/tambah', async (req, res) => {
-    const { pengajaran_id, nama_ujian, durasi, tanggal_mulai, tanggal_selesai, acak_soal, acak_pilihan, batas_pelanggaran } = req.body;
+    const { pengajaran_id, nama_ujian, durasi, tanggal_mulai, tanggal_selesai, acak_soal, acak_pilihan, batas_pelanggaran, token_ujian } = req.body;
     const batas = parseInt(batas_pelanggaran) || 3;
     if (batas < 1) return res.redirect('/admin/ujian?error=Batas pelanggaran minimal 1');
+    const token = token_ujian && token_ujian.trim() !== '' ? token_ujian.trim() : null;
     try {
-        await pool.query(`INSERT INTO ujian (pengajaran_id, nama_ujian, durasi, tanggal_mulai, tanggal_selesai, acak_soal, acak_pilihan, batas_pelanggaran) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [pengajaran_id, nama_ujian, durasi, tanggal_mulai, tanggal_selesai, acak_soal || 0, acak_pilihan || 0, batas]);
+        await pool.query(`INSERT INTO ujian (pengajaran_id, nama_ujian, durasi, tanggal_mulai, tanggal_selesai, acak_soal, acak_pilihan, batas_pelanggaran, token_ujian) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, [pengajaran_id, nama_ujian, durasi, tanggal_mulai, tanggal_selesai, acak_soal || 0, acak_pilihan || 0, batas, token]);
         res.redirect('/admin/ujian?msg=Ujian berhasil ditambahkan');
     } catch (err) { console.error(err); res.redirect('/admin/ujian?error=Gagal menambahkan ujian'); }
 });
@@ -138,14 +140,15 @@ router.get('/ujian/edit/:id', async (req, res) => {
     const [ujian] = await pool.query('SELECT * FROM ujian WHERE id = ?', [req.params.id]);
     if (ujian.length === 0) return res.redirect('/admin/ujian?error=Ujian tidak ditemukan');
     const [pengajaran] = await pool.query(`SELECT pg.id, p.nama_mapel, k.nama_kelas, g.nama as guru_nama FROM pengajaran pg JOIN mata_pelajaran p ON pg.mapel_id = p.id JOIN kelas k ON pg.kelas_id = k.id JOIN guru g ON pg.guru_id = g.id`);
-    res.render('admin/ujian_edit', { ujian: ujian[0], pengajaran });
+    res.render('admin/ujian_edit', { ujian: ujian[0], pengajaran, error: req.query.error });
 });
 router.post('/ujian/edit/:id', async (req, res) => {
-    const { pengajaran_id, nama_ujian, durasi, tanggal_mulai, tanggal_selesai, acak_soal, acak_pilihan, batas_pelanggaran } = req.body;
+    const { pengajaran_id, nama_ujian, durasi, tanggal_mulai, tanggal_selesai, acak_soal, acak_pilihan, batas_pelanggaran, token_ujian } = req.body;
     const batas = parseInt(batas_pelanggaran) || 3;
     if (batas < 1) return res.redirect(`/admin/ujian/edit/${req.params.id}?error=Batas pelanggaran minimal 1`);
+    const token = token_ujian && token_ujian.trim() !== '' ? token_ujian.trim() : null;
     try {
-        await pool.query(`UPDATE ujian SET pengajaran_id=?, nama_ujian=?, durasi=?, tanggal_mulai=?, tanggal_selesai=?, acak_soal=?, acak_pilihan=?, batas_pelanggaran=? WHERE id=?`, [pengajaran_id, nama_ujian, durasi, tanggal_mulai, tanggal_selesai, acak_soal || 0, acak_pilihan || 0, batas, req.params.id]);
+        await pool.query(`UPDATE ujian SET pengajaran_id=?, nama_ujian=?, durasi=?, tanggal_mulai=?, tanggal_selesai=?, acak_soal=?, acak_pilihan=?, batas_pelanggaran=?, token_ujian=? WHERE id=?`, [pengajaran_id, nama_ujian, durasi, tanggal_mulai, tanggal_selesai, acak_soal || 0, acak_pilihan || 0, batas, token, req.params.id]);
         res.redirect('/admin/ujian?msg=Ujian berhasil diupdate');
     } catch (err) { console.error(err); res.redirect(`/admin/ujian/edit/${req.params.id}?error=Gagal update ujian`); }
 });
@@ -457,6 +460,82 @@ router.get('/log-kecurangan', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────
+// GET /admin/monitor/:ujianId & /admin/monitor (T4.3)
+// Halaman dashboard pemantauan ujian real-time
+// ─────────────────────────────────────────────
+router.get('/monitor', async (req, res) => {
+    try {
+        const [activeUjian] = await pool.query(`
+            SELECT id FROM ujian
+            ORDER BY (tanggal_mulai <= NOW() AND tanggal_selesai >= NOW()) DESC, created_at DESC
+            LIMIT 1
+        `);
+        if (activeUjian.length > 0) {
+            return res.redirect(`/admin/monitor/${activeUjian[0].id}`);
+        }
+        res.redirect('/admin/ujian?msg=Belum ada ujian untuk dipantau');
+    } catch (err) {
+        logger.error(`GET /admin/monitor error: ${err.message}`);
+        res.redirect('/admin/ujian');
+    }
+});
+
+router.get('/monitor/:ujianId', async (req, res) => {
+    const ujianId = parseInt(req.params.ujianId, 10);
+    if (isNaN(ujianId)) {
+        return res.redirect('/admin/ujian?error=ID ujian tidak valid');
+    }
+
+    try {
+        const snapshot = await monitorService.getMonitorSnapshot(ujianId, pool);
+        if (!snapshot) {
+            return res.redirect('/admin/ujian?error=Ujian tidak ditemukan');
+        }
+
+        const [ujianList] = await pool.query(`
+            SELECT u.id, u.nama_ujian, k.nama_kelas
+            FROM ujian u
+            JOIN pengajaran p ON u.pengajaran_id = p.id
+            JOIN kelas k ON p.kelas_id = k.id
+            ORDER BY (u.tanggal_mulai <= NOW() AND u.tanggal_selesai >= NOW()) DESC, u.created_at DESC
+        `);
+
+        res.render('admin/monitor', {
+            ujian: snapshot.ujian,
+            total_soal: snapshot.total_soal,
+            ringkasan: snapshot.ringkasan,
+            siswa: snapshot.siswa,
+            ujianList
+        });
+    } catch (err) {
+        logger.error(`GET /admin/monitor/${ujianId} error: ${err.message}`);
+        res.redirect('/admin/ujian?error=Gagal memuat halaman pemantauan');
+    }
+});
+
+// ─────────────────────────────────────────────
+// GET /admin/api/monitor/:ujianId (DESIGN §3.6, §4, T4.1)
+// Snapshot pemantauan ujian untuk admin
+// ─────────────────────────────────────────────
+router.get('/api/monitor/:ujianId', async (req, res) => {
+    const ujianId = parseInt(req.params.ujianId, 10);
+    if (isNaN(ujianId)) {
+        return res.status(400).json({ error: 'ID ujian tidak valid' });
+    }
+
+    try {
+        const snapshot = await monitorService.getMonitorSnapshot(ujianId, pool);
+        if (!snapshot) {
+            return res.status(404).json({ error: 'Ujian tidak ditemukan' });
+        }
+        res.json(snapshot);
+    } catch (err) {
+        logger.error(`GET /admin/api/monitor/${ujianId} error: ${err.message}`);
+        res.status(500).json({ error: 'Gagal mengambil data pemantauan' });
+    }
+});
+
+// ─────────────────────────────────────────────
 // POST /admin/api/sesi/:id/buka-kunci (DESIGN §3.6, §4, T1.9)
 // Membuka sesi yang keluar_paksa -> sedang_ujian tanpa hapus data
 // ─────────────────────────────────────────────
@@ -504,33 +583,23 @@ router.post('/api/sesi/:id/buka-kunci', async (req, res) => {
             [sesi.siswa_id, sesi.ujian_id]
         );
 
-        // Catat ke audit_admin jika tabel tersedia
-        try {
-            await pool.query(`
-                CREATE TABLE IF NOT EXISTS audit_admin (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    admin_id INT NULL,
-                    sesi_id INT NOT NULL,
-                    aksi VARCHAR(50) NOT NULL,
-                    detail TEXT NULL,
-                    dibuat_pada TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    INDEX idx_audit_sesi (sesi_id)
-                ) ENGINE=InnoDB;
-            `);
-            await pool.query(
-                `INSERT INTO audit_admin (admin_id, sesi_id, aksi, detail)
-                 VALUES (?, ?, 'buka-kunci', ?)`,
-                [
-                    req.session.adminId || null,
-                    sesiId,
-                    `Buka kunci sesi siswa NIS ${sesi.nis} (${sesi.nama}) untuk ujian ${sesi.nama_ujian}`
-                ]
-            );
-        } catch (auditErr) {
-            logger.warn(`Gagal mencatat audit_admin: ${auditErr.message}`);
-        }
+        // Catat ke audit_admin
+        await pool.query(
+            `INSERT INTO audit_admin (admin_id, sesi_id, aksi, detail)
+             VALUES (?, ?, 'buka-kunci', ?)`,
+            [
+                req.session.adminId || null,
+                sesiId,
+                `Buka kunci sesi siswa NIS ${sesi.nis} (${sesi.nama}) untuk ujian ${sesi.nama_ujian}`
+            ]
+        );
 
         logger.info(`Admin ${req.session.adminId || 'unknown'} membuka kunci sesi ID ${sesiId} (Siswa: ${sesi.nis})`);
+
+        const io = req.app.get('io');
+        if (io) {
+            await monitorService.siarkanUpdateSiswa(io, sesi.ujian_id, sesi.siswa_id, pool, { event: 'buka_kunci' });
+        }
 
         res.json({
             success: true,
@@ -542,6 +611,164 @@ router.post('/api/sesi/:id/buka-kunci', async (req, res) => {
     } catch (err) {
         logger.error(`buka-kunci sesi error: ${err.message}`);
         res.status(500).json({ error: 'Gagal membuka kunci sesi' });
+    }
+});
+
+// ─────────────────────────────────────────────
+// POST /admin/api/sesi/:id/tambah-waktu (DESIGN §3.6, §4, T4.4)
+// Menambahkan menit ujian ke batas_waktu sesi siswa
+// ─────────────────────────────────────────────
+router.post('/api/sesi/:id/tambah-waktu', async (req, res) => {
+    const sesiId = parseInt(req.params.id, 10);
+    const menit = parseInt(req.body.menit, 10);
+
+    if (isNaN(sesiId)) {
+        return res.status(400).json({ error: 'ID sesi tidak valid' });
+    }
+    if (isNaN(menit) || menit <= 0 || menit > 180) {
+        return res.status(400).json({ error: 'Jumlah menit harus berupa angka antara 1 sampai 180' });
+    }
+
+    try {
+        const [rows] = await pool.query(
+            `SELECT s.*, sw.nama, sw.nis, u.nama_ujian
+             FROM sesi_ujian s
+             JOIN siswa sw ON s.siswa_id = sw.id
+             JOIN ujian u ON s.ujian_id = u.id
+             WHERE s.id = ?`,
+            [sesiId]
+        );
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Sesi ujian tidak ditemukan' });
+        }
+
+        const sesi = rows[0];
+
+        if (sesi.status === 'selesai') {
+            return res.status(409).json({ error: 'Tidak dapat menambah waktu untuk sesi yang sudah selesai' });
+        }
+
+        const sesiService = require('../services/sesiService');
+        const updatedSesi = await sesiService.perpanjang(sesi.id, menit, pool);
+
+        // Catat ke audit_admin
+        await pool.query(
+            `INSERT INTO audit_admin (admin_id, sesi_id, aksi, detail)
+             VALUES (?, ?, 'tambah-waktu', ?)`,
+            [
+                req.session.adminId || null,
+                sesiId,
+                `Tambah waktu ${menit} menit untuk siswa NIS ${sesi.nis} (${sesi.nama}) pada ujian ${sesi.nama_ujian}`
+            ]
+        );
+
+        logger.info(`Admin ${req.session.adminId || 'unknown'} menambah ${menit} menit untuk sesi ID ${sesiId} (Siswa: ${sesi.nis})`);
+
+        // Siarkan pembaruan ke dashboard monitor admin
+        const io = req.app.get('io');
+        if (io) {
+            await monitorService.siarkanUpdateSiswa(io, sesi.ujian_id, sesi.siswa_id, pool, {
+                event: 'tambah_waktu',
+                tambahan_menit: menit,
+                batas_waktu: updatedSesi.batas_waktu
+            });
+
+            // Kirim notifikasi socket langsung ke siswa jika sedang terhubung
+            if (sesi.socket_id) {
+                const sisaDetik = sesiService.hitungSisaDetik(updatedSesi, new Date());
+                io.to(sesi.socket_id).emit('tambah-waktu', {
+                    menit,
+                    sisa_detik: sisaDetik,
+                    batas_waktu: updatedSesi.batas_waktu,
+                    pesan: `Waktu ujian Anda telah ditambah ${menit} menit oleh pengawas.`
+                });
+            }
+        }
+
+        res.json({
+            success: true,
+            message: `Waktu berhasil ditambah ${menit} menit`,
+            sesi_id: sesiId,
+            tambahan_menit: updatedSesi.tambahan_menit,
+            batas_waktu: updatedSesi.batas_waktu
+        });
+
+    } catch (err) {
+        logger.error(`tambah-waktu sesi error: ${err.message}`);
+        res.status(500).json({ error: 'Gagal menambah waktu sesi ujian' });
+    }
+});
+
+// ─────────────────────────────────────────────
+// POST /admin/api/sesi/:id/paksa-selesai (DESIGN §3.6, §4, T4.4)
+// Memaksa finalisasi sesi ujian siswa dari dashboard admin
+// ─────────────────────────────────────────────
+router.post('/api/sesi/:id/paksa-selesai', async (req, res) => {
+    const sesiId = parseInt(req.params.id, 10);
+    if (isNaN(sesiId)) {
+        return res.status(400).json({ error: 'ID sesi tidak valid' });
+    }
+
+    try {
+        const [rows] = await pool.query(
+            `SELECT s.*, sw.nama, sw.nis, u.nama_ujian
+             FROM sesi_ujian s
+             JOIN siswa sw ON s.siswa_id = sw.id
+             JOIN ujian u ON s.ujian_id = u.id
+             WHERE s.id = ?`,
+            [sesiId]
+        );
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Sesi ujian tidak ditemukan' });
+        }
+
+        const sesi = rows[0];
+
+        if (sesi.status === 'selesai') {
+            return res.status(409).json({ error: 'Sesi ujian sudah dalam status selesai' });
+        }
+
+        const { finalizeSesi } = require('../services/finalizeService');
+        await finalizeSesi(sesi.siswa_id, sesi.ujian_id, pool);
+
+        // Catat ke audit_admin
+        await pool.query(
+            `INSERT INTO audit_admin (admin_id, sesi_id, aksi, detail)
+             VALUES (?, ?, 'paksa-selesai', ?)`,
+            [
+                req.session.adminId || null,
+                sesiId,
+                `Paksa selesai sesi siswa NIS ${sesi.nis} (${sesi.nama}) pada ujian ${sesi.nama_ujian}`
+            ]
+        );
+
+        logger.info(`Admin ${req.session.adminId || 'unknown'} memaksa selesai sesi ID ${sesiId} (Siswa: ${sesi.nis})`);
+
+        // Notifikasi socket ke siswa jika terhubung
+        const io = req.app.get('io');
+        if (io) {
+            if (sesi.socket_id) {
+                io.to(sesi.socket_id).emit('paksa-submit', {
+                    message: '⚠️ Ujian Anda telah diakhiri oleh pengawas.'
+                });
+            }
+
+            // Siarkan ke dashboard admin
+            await monitorService.siarkanUpdateSiswa(io, sesi.ujian_id, sesi.siswa_id, pool, { event: 'selesai' });
+        }
+
+        res.json({
+            success: true,
+            message: 'Sesi ujian berhasil dipaksa selesai',
+            sesi_id: sesiId,
+            status: 'selesai'
+        });
+
+    } catch (err) {
+        logger.error(`paksa-selesai sesi error: ${err.message}`);
+        res.status(500).json({ error: 'Gagal menyelesaikan sesi ujian' });
     }
 });
 

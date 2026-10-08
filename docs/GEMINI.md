@@ -47,3 +47,17 @@ Laporan eksekusi Tx.y
 - Logger: `utils/logger.js` (winston).
 - Test DB: set `DB_NAME=cbt_sekolah_test` saat menjalankan test; buat lewat `npm run migrate` setelah T0.8.
 - Kirim ke klien hanya kolom yang diperlukan; tidak pernah `jawaban_benar`.
+
+
+**Untuk gemini**
+
+1. Anda adalah eksekutor Code
+2. Pahami Workflow program sebelum eksekusi
+3. Jangan menghabiskan waktu untuk mengecek versi dan test diawal
+4. Act like senior software developer
+5. Buat setiapa code presisi , tidak rentan pada security, logic dan system security
+6. Buat code nya maintanable
+7. Jika ada hal yang membutuhkan Decission libatkan saya
+8. Ask hanya pada hal hal decission saja, jangan ask pada command terminal
+9. Biasakan membuat code yang dapat dibaca oleh saya dan oleh developer lain
+10. kalau perlu menginstall dependency jangan pakai yang deprecated 

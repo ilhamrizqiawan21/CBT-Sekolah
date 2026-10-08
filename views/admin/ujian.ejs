@@ -80,7 +80,7 @@
                     <thead class="table-light">
                         <tr>
                             <th>Nama Ujian</th><th>Mapel</th><th>Kelas</th><th>Guru</th>
-                            <th>Durasi</th><th>Mulai</th><th>Selesai</th><th>Pelanggaran</th><th>Aksi</th>
+                            <th>Durasi</th><th>Token</th><th>Mulai</th><th>Selesai</th><th>Pelanggaran</th><th>Aksi</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -92,10 +92,18 @@
                                     <td><%= u.nama_kelas %></td>
                                     <td><%= u.guru_nama %></td>
                                     <td><%= u.durasi %> menit</td>
+                                    <td>
+                                        <% if (u.token_ujian) { %>
+                                            <span class="badge bg-secondary font-monospace"><%= u.token_ujian %></span>
+                                        <% } else { %>
+                                            <span class="text-muted small">-</span>
+                                        <% } %>
+                                    </td>
                                     <td><%= new Date(u.tanggal_mulai).toLocaleString() %></td>
                                     <td><%= new Date(u.tanggal_selesai).toLocaleString() %></td>
                                     <td><span class="badge bg-warning"><%= u.batas_pelanggaran %>x</span></td>
                                     <td>
+                                        <a href="/admin/monitor/<%= u.id %>" class="btn btn-sm btn-info text-white" title="Pantau Ujian"><i class="bi bi-display"></i></a>
                                         <a href="/admin/ujian/edit/<%= u.id %>" class="btn btn-sm btn-warning"><i class="bi bi-pencil"></i></a>
                                         <a href="/admin/ujian/hapus/<%= u.id %>" class="btn btn-sm btn-danger" onclick="return confirm('Hapus ujian? Semua soal & jawaban akan terhapus.')"><i class="bi bi-trash"></i></a>
                                     </td>
@@ -147,6 +155,14 @@
                         <div class="col-md-3 mb-3"><label>Acak Pilihan</label><select name="acak_pilihan" class="form-select"><option value="1">Ya</option><option value="0">Tidak</option></select></div>
                         <div class="col-md-6 mb-3"><label>Tanggal Mulai *</label><input type="datetime-local" name="tanggal_mulai" class="form-control" required></div>
                         <div class="col-md-6 mb-3"><label>Tanggal Selesai *</label><input type="datetime-local" name="tanggal_selesai" class="form-control" required></div>
+                        <div class="col-md-6 mb-3">
+                            <label>Token Ujian (Opsional)</label>
+                            <div class="input-group">
+                                <input type="text" name="token_ujian" id="token_ujian_tambah" class="form-control" placeholder="Kosongkan jika tanpa token">
+                                <button type="button" class="btn btn-outline-secondary" onclick="generateTokenTambah()"><i class="bi bi-shuffle"></i> Acak</button>
+                            </div>
+                            <small class="text-muted">Jika diisi, siswa wajib memasukkan token ini saat login.</small>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer"><button type="submit" class="btn btn-primary">Simpan</button></div>
@@ -154,5 +170,16 @@
         </div>
     </div>
 </div>
+
+<script>
+function generateTokenTambah() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let token = '';
+    for (let i = 0; i < 6; i++) {
+        token += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    document.getElementById('token_ujian_tambah').value = token;
+}
+</script>
 
 <%- include('../partials/footer') %>
