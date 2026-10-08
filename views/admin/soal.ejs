@@ -64,7 +64,7 @@
                             <td><%= s.poin %></td>
                             <td>
                                 <a href="/admin/soal/edit/<%= s.id %>" class="btn btn-sm btn-warning"><i class="bi bi-pencil"></i></a>
-                                <a href="/admin/soal/hapus/<%= s.id %>" class="btn btn-sm btn-danger" onclick="return confirm('Yakin hapus soal ini?')"><i class="bi bi-trash"></i></a>
+                                <form method="post" action="/admin/soal/hapus/<%= s.id %>" class="d-inline" onsubmit="return confirm('Yakin hapus soal ini?')"><button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-trash"></i></button></form>
                              </td>
                          </tr>
                         <% }) %>
@@ -110,7 +110,7 @@
                             <div class="col-12 mb-2"><label>Jawaban Benar (A/B/C/D)</label><input type="text" name="jawaban_benar" class="form-control" maxlength="1"></div></div>
                         </div>
                         <div id="form_other" style="display:none" class="col-12">
-                            <div class="mb-3"><label>Jawaban Benar (JSON untuk menjodohkan / kata kunci untuk essay)</label><textarea name="jawaban_benar" class="form-control" rows="2" placeholder='Menjodohkan: [{"kiri":"A","kanan":"Jakarta"}] atau Essay: kata1,kata2'></textarea></div>
+                            <div class="mb-3"><label>Jawaban Benar (JSON untuk menjodohkan; kosongkan untuk essay)</label><textarea name="jawaban_benar" class="form-control" rows="2" placeholder='Menjodohkan: [{"kiri":"A","kanan":"Jakarta"}]'></textarea></div>
                         </div>
                     </div>
                 </div>

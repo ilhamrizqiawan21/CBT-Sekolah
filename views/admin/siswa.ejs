@@ -67,7 +67,7 @@
                                 <td><%= s.kelas || '-' %></td>
                                 <td><%= s.pin_ujian %></td>
                                 <td>
-                                    <a href="/admin/siswa/hapus/<%= s.id %>" class="btn btn-sm btn-danger" onclick="return confirm('Yakin hapus siswa ini? Semua data ujiannya juga akan terhapus.')"><i class="bi bi-trash"></i> Hapus</a>
+                                    <form method="post" action="/admin/siswa/hapus/<%= s.id %>" class="d-inline" onsubmit="return confirm('Yakin hapus siswa ini? Semua data ujiannya juga akan terhapus.')"><button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-trash"></i> Hapus</button></form>
                                 </td>
                             </tr>
                             <% }) %>

@@ -105,7 +105,7 @@
                                     <td>
                                         <a href="/admin/monitor/<%= u.id %>" class="btn btn-sm btn-info text-white" title="Pantau Ujian"><i class="bi bi-display"></i></a>
                                         <a href="/admin/ujian/edit/<%= u.id %>" class="btn btn-sm btn-warning"><i class="bi bi-pencil"></i></a>
-                                        <a href="/admin/ujian/hapus/<%= u.id %>" class="btn btn-sm btn-danger" onclick="return confirm('Hapus ujian? Semua soal & jawaban akan terhapus.')"><i class="bi bi-trash"></i></a>
+                                        <form method="post" action="/admin/ujian/hapus/<%= u.id %>" class="d-inline" onsubmit="return confirm('Hapus ujian? Semua soal & jawaban akan terhapus.')"><button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-trash"></i></button></form>
                                     </td>
                                 </tr>
                             <% }) %>

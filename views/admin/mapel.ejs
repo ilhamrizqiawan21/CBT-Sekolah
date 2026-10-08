@@ -52,7 +52,7 @@
                                 <td><%= m.nama_mapel %></td>
                                 <td>
                                     <button class="btn btn-sm btn-warning btn-edit" data-id="<%= m.id %>" data-nama="<%= m.nama_mapel %>"><i class="bi bi-pencil"></i> Edit</button>
-                                    <a href="/admin/mapel/hapus/<%= m.id %>" class="btn btn-sm btn-danger" onclick="return confirm('Yakin hapus mata pelajaran ini? Akan mempengaruhi ujian yang terkait.')"><i class="bi bi-trash"></i> Hapus</a>
+                                    <form method="post" action="/admin/mapel/hapus/<%= m.id %>" class="d-inline" onsubmit="return confirm('Yakin hapus mata pelajaran ini? Akan mempengaruhi ujian yang terkait.')"><button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-trash"></i> Hapus</button></form>
                                  </td>
                              </tr>
                             <% }) %>

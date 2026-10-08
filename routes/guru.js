@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../models/db');
 const { isGuru } = require('../middleware/auth');
+const logger = require('../utils/logger');
+const { poinDefault } = require('../utils/helper');
 
 router.use(isGuru);
 
@@ -192,48 +194,71 @@ router.get('/api/ujian-by-guru', async (req, res) => {
 // Batch tambah soal (POST)
 router.post('/soal/batch-tambah', async (req, res) => {
     const { ujian_id, soal_pg, soal_menjodohkan, soal_essay, pengecoh } = req.body;
-    if (!ujian_id) return res.status(400).json({ success: false, error: 'Ujian tidak dipilih' });
-    
+    const ujianId = parseInt(ujian_id, 10);
+    if (!ujianId) return res.status(400).json({ success: false, error: 'Ujian tidak dipilih' });
+
+    const daftar = [soal_pg, soal_menjodohkan, soal_essay];
+    const poinValid = p => p === undefined || p === null || p === '' || (Number.isInteger(Number(p)) && Number(p) > 0);
+    const bentukValid = daftar.every(d => d === undefined || (Array.isArray(d) && d.every(x => x && typeof x === 'object' && poinValid(x.poin))))
+        && (soal_menjodohkan || []).every(x => x.pasangan && typeof x.pasangan === 'object')
+        && (pengecoh === undefined || Array.isArray(pengecoh));
+    if (!bentukValid) return res.status(400).json({ success: false, error: 'Format data soal tidak valid' });
+
+    const authCheck = await checkGuruPengampuUjian(ujianId, req.session.guruId);
+    if (!authCheck.exists || !authCheck.authorized) {
+        return res.status(403).json({ success: false, error: 'Anda bukan guru pengampu ujian ini' });
+    }
+
+    const pg = soal_pg || [];
+    const menjodohkan = soal_menjodohkan || [];
+    const essay = soal_essay || [];
+
+    const conn = await pool.getConnection();
     let totalInserted = 0;
     try {
-        for (const soal of soal_pg) {
+        await conn.beginTransaction();
+        for (const soal of pg) {
             if (!soal.teks_soal) continue;
-            await pool.query(
+            await conn.query(
                 `INSERT INTO soal (ujian_id, tipe_soal, teks_soal, poin, pilihan_a, pilihan_b, pilihan_c, pilihan_d, jawaban_benar) 
                  VALUES (?, 'pg', ?, ?, ?, ?, ?, ?, ?)`,
-                [ujian_id, soal.teks_soal, soal.poin || 1, soal.pilihan_a || '', soal.pilihan_b || '', soal.pilihan_c || '', soal.pilihan_d || '', soal.jawaban_benar || '']
+                [ujianId, soal.teks_soal, poinDefault('pg', soal.poin), soal.pilihan_a || '', soal.pilihan_b || '', soal.pilihan_c || '', soal.pilihan_d || '', soal.jawaban_benar || '']
             );
             totalInserted++;
         }
-        
-        if (soal_menjodohkan.length > 0) {
-            const pasangan = soal_menjodohkan.map(s => ({ kiri: s.pasangan.kiri, kanan: s.pasangan.kanan }));
+
+        if (menjodohkan.length > 0) {
+            const pasangan = menjodohkan.map(s => ({ kiri: s.pasangan.kiri, kanan: s.pasangan.kanan }));
             const jawabanJSON = JSON.stringify(pasangan);
             const opsiJSON = JSON.stringify({ pasangan, pengecoh: pengecoh || [] });
-            const teksGabungan = soal_menjodohkan.map((s, i) => `${i+1}. ${s.teks_soal}`).join('\n');
-            const totalPoin = soal_menjodohkan.reduce((sum, s) => sum + (s.poin || 2), 0);
-            await pool.query(
+            const teksGabungan = menjodohkan.map((s, i) => `${i+1}. ${s.teks_soal}`).join('\n');
+            const totalPoin = menjodohkan.reduce((sum, s) => sum + (Number(s.poin) || 2), 0);
+            await conn.query(
                 `INSERT INTO soal (ujian_id, tipe_soal, teks_soal, poin, jawaban_benar, opsi_tambahan) 
                  VALUES (?, 'menjodohkan', ?, ?, ?, ?)`,
-                [ujian_id, teksGabungan, totalPoin, jawabanJSON, opsiJSON]
+                [ujianId, teksGabungan, totalPoin, jawabanJSON, opsiJSON]
             );
             totalInserted++;
         }
-        
-        for (const soal of soal_essay) {
+
+        for (const soal of essay) {
             if (!soal.teks_soal) continue;
-            await pool.query(
+            await conn.query(
                 `INSERT INTO soal (ujian_id, tipe_soal, teks_soal, poin, jawaban_benar, opsi_tambahan) 
                  VALUES (?, 'essay', ?, ?, ?, ?)`,
-                [ujian_id, soal.teks_soal, soal.poin || 4, '[]', '{}']
+                [ujianId, soal.teks_soal, poinDefault('essay', soal.poin), '[]', '{}']
             );
             totalInserted++;
         }
-        
+
+        await conn.commit();
         res.json({ success: true, total: totalInserted });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, error: err.message });
+        await conn.rollback();
+        logger.error(`Batch tambah soal gagal: ${err.message}`);
+        res.status(500).json({ success: false, error: 'Gagal menyimpan soal' });
+    } finally {
+        conn.release();
     }
 });
 
@@ -263,16 +288,29 @@ router.get('/soal/edit/:id', async (req, res) => {
 // Proses edit soal
 router.post('/soal/edit/:id', async (req, res) => {
     const { ujian_id, tipe_soal, teks_soal, poin, pilihan_a, pilihan_b, pilihan_c, pilihan_d, jawaban_benar, opsi_tambahan } = req.body;
+    const guruId = req.session.guruId;
     try {
+        // Soal asal dan ujian tujuan harus milik guru ini (otorisasi per mapel)
+        const [milik] = await pool.query(`
+            SELECT s.id FROM soal s
+            JOIN ujian u ON s.ujian_id = u.id
+            JOIN pengajaran pg ON u.pengajaran_id = pg.id
+            WHERE s.id = ? AND pg.guru_id = ?
+        `, [req.params.id, guruId]);
+        const tujuan = await checkGuruPengampuUjian(parseInt(ujian_id, 10), guruId);
+        if (milik.length === 0 || !tujuan.exists || !tujuan.authorized) {
+            return res.redirect('/guru/kelola-soal?error=Soal tidak ditemukan');
+        }
+
         if (tipe_soal === 'pg') {
             await pool.query(
                 `UPDATE soal SET ujian_id=?, tipe_soal=?, teks_soal=?, poin=?, pilihan_a=?, pilihan_b=?, pilihan_c=?, pilihan_d=?, jawaban_benar=? WHERE id=?`,
-                [ujian_id, tipe_soal, teks_soal, poin || 1, pilihan_a, pilihan_b, pilihan_c, pilihan_d, jawaban_benar, req.params.id]
+                [ujian_id, tipe_soal, teks_soal, poinDefault(tipe_soal, poin), pilihan_a, pilihan_b, pilihan_c, pilihan_d, jawaban_benar, req.params.id]
             );
         } else {
             await pool.query(
                 `UPDATE soal SET ujian_id=?, tipe_soal=?, teks_soal=?, poin=?, jawaban_benar=?, opsi_tambahan=? WHERE id=?`,
-                [ujian_id, tipe_soal, teks_soal, poin || 1, jawaban_benar, opsi_tambahan, req.params.id]
+                [ujian_id, tipe_soal, teks_soal, poinDefault(tipe_soal, poin), jawaban_benar, opsi_tambahan, req.params.id]
             );
         }
         res.redirect('/guru/kelola-soal?msg=Soal berhasil diupdate');
@@ -283,7 +321,7 @@ router.post('/soal/edit/:id', async (req, res) => {
 });
 
 // Hapus soal
-router.get('/soal/hapus/:id', async (req, res) => {
+router.post('/soal/hapus/:id', async (req, res) => {
     const guruId = req.session.guruId;
     try {
         const [soal] = await pool.query(`

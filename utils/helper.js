@@ -18,4 +18,11 @@ async function cekWaktuUjian(ujian_id) {
     }
 }
 
-module.exports = { cekWaktuUjian };
+// Bobot default per tipe soal (D-004): PG 2, menjodohkan 2, essay 4
+function poinDefault(tipe, poin) {
+    const n = parseInt(poin, 10);
+    if (Number.isInteger(n) && n > 0) return n;
+    return tipe === 'essay' ? 4 : 2;
+}
+
+module.exports = { cekWaktuUjian, poinDefault };

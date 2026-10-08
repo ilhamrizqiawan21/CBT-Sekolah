@@ -58,9 +58,9 @@
                                     data-username="<%= g.username %>">
                                     <i class="bi bi-pencil"></i> Edit
                                 </button>
-                                <a href="/admin/guru/hapus/<%= g.id %>" class="btn btn-sm btn-danger" onclick="return confirm('Yakin hapus guru ini?')">
+                                <form method="post" action="/admin/guru/hapus/<%= g.id %>" class="d-inline" onsubmit="return confirm('Yakin hapus guru ini?')"><button type="submit" class="btn btn-sm btn-danger">
                                     <i class="bi bi-trash"></i> Hapus
-                                </a>
+                                </button></form>
                             </td>
                         </tr>
                         <% }) %>

@@ -4,6 +4,7 @@ const pool    = require('../models/db');
 const { cekWaktuUjian } = require('../utils/helper');
 const { isSiswaAPI } = require('../middleware/auth');
 const monitorService = require('../services/monitorService');
+const penilaianService = require('../services/penilaianService');
 
 // ─────────────────────────────────────────────
 // FIX #3 — Rate limiter in-memory
@@ -253,12 +254,10 @@ function hitungIsBenar(soal, jawaban) {
     if (!soal) return 0;
     const tipe = soal.tipe_soal;
     if (tipe === 'pg') {
-        const jUser = String(jawaban !== undefined && jawaban !== null ? jawaban : '').trim().toUpperCase();
-        const jBenar = String(soal.jawaban_benar || '').trim().toUpperCase();
-        return jUser === jBenar ? 1 : 0;
+        return penilaianService.cekJawabanPG(jawaban, soal.jawaban_benar) ? 1 : 0;
     }
     if (tipe === 'menjodohkan') {
-        return require('../services/penilaianService').cekJawabanMenjodohkan(jawaban, soal.jawaban_benar) ? 1 : 0;
+        return penilaianService.cekJawabanMenjodohkan(jawaban, soal.jawaban_benar) ? 1 : 0;
     }
     if (tipe === 'essay') {
         // D-006: Essay dijawab di kertas, dinilai guru per soal (0–4)
@@ -513,23 +512,8 @@ router.post('/simpan-jawaban', isSiswaAPI, async (req, res) => {
             return res.status(404).json({ error: 'Soal tidak ditemukan' });
         }
 
-        let isBenar = 0;
-        const tipe  = soal[0].tipe_soal;
-
-        if (tipe === 'pg') {
-            isBenar = (jawaban === soal[0].jawaban_benar) ? 1 : 0;
-        }
-        else if (tipe === 'menjodohkan') {
-            try {
-                const jawabanUser  = JSON.parse(jawaban || '[]');
-                const jawabanBenar = JSON.parse(soal[0].jawaban_benar || '[]');
-                isBenar = JSON.stringify(jawabanUser.sort()) === JSON.stringify(jawabanBenar.sort()) ? 1 : 0;
-            } catch { isBenar = 0; }
-        }
-        else if (tipe === 'essay') {
-            // T3.3, D-006: Essay dijawab di lembar kertas dan dinilai guru secara manual (0..poin)
-            isBenar = null;
-        }
+        // D-006: essay tidak dinilai otomatis (null); PG/menjodohkan lewat penilaianService
+        const isBenar = hitungIsBenar(soal[0], jawaban);
 
         await pool.query(
             `INSERT INTO jawaban_siswa (siswa_id, ujian_id, soal_id, jawaban_dipilih, is_benar)

@@ -69,7 +69,7 @@
                                 <td><%= s.poin %></td>
                                 <td>
                                     <a href="/guru/soal/edit/<%= s.id %>" class="btn btn-sm btn-warning"><i class="bi bi-pencil"></i></a>
-                                    <a href="/guru/soal/hapus/<%= s.id %>" class="btn btn-sm btn-danger" onclick="return confirm('Yakin hapus soal ini?')"><i class="bi bi-trash"></i></a>
+                                    <form method="post" action="/guru/soal/hapus/<%= s.id %>" class="d-inline" onsubmit="return confirm('Yakin hapus soal ini?')"><button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-trash"></i></button></form>
                                  </td>
                               </tr>
                             <% }) %>

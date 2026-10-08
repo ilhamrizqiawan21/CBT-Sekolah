@@ -64,9 +64,9 @@
                                         data-kelas="<%= p.kelas_id %>">
                                         <i class="bi bi-pencil"></i> Edit
                                     </button>
-                                    <a href="/admin/pengajaran/hapus/<%= p.id %>" class="btn btn-sm btn-danger" onclick="return confirm('Yakin hapus pengajaran ini? Akan menghapus ujian yang terkait jika ada.')">
+                                    <form method="post" action="/admin/pengajaran/hapus/<%= p.id %>" class="d-inline" onsubmit="return confirm('Yakin hapus pengajaran ini? Akan menghapus ujian yang terkait jika ada.')"><button type="submit" class="btn btn-sm btn-danger">
                                         <i class="bi bi-trash"></i> Hapus
-                                    </a>
+                                    </button></form>
                                  </td>
                              </tr>
                             <% }) %>

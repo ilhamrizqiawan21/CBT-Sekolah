@@ -527,3 +527,41 @@ Dijalankan sendiri: `npm test` 92/92 lulus. Tes Fase 4 hanya menguji API/service
 - `isAdmin`: halaman admin untuk guru/siswa kembali redirect; 403 JSON hanya untuk `/api/monitor` dan `/api/*` oleh guru/siswa yang login.
 - Migrasi 003 idempoten (guard `information_schema` + `PREPARE`); dijalankan 2× pada DB uji tanpa error.
 - Tes: `aksi_admin_audit.test.js` #0 (batas menit, akumulasi paralel); `halaman_monitor.test.js` #1 disesuaikan. `npm test` 94/94; `test:ui:monitor` dan `test:ui` hijau.
+
+### R-FINAL (Claude, 2026-10-09)
+Dijalankan sendiri: `npm test` 123/123 lulus (32 suites). `npm audit`: 7 temuan (4 high, 3 moderate). **Tidak** dijalankan ulang: `test:ui` Playwright, `loadtest` (menulis data sintetis lewat server yang memakai `.env`; butuh persetujuan agar tidak menyentuh DB utama). Fase 5–6 belum pernah direview formal sebelumnya; ditinjau di sini.
+
+**Pemeriksaan wajib**
+- Penilaian: `LULUS` — `penilaian_service.test.js` membuktikan contoh PRD §5 (100 dan 72, all-or-nothing menjodohkan, skala 100) dan `penilaianService.hitung` dipakai `finalizeService`.
+- Sesi: `LULUS` (berdasarkan tes: `sesi_*`, `takeover_login`, `ketahanan_e2e`, `persistent_seed`); kode tidak dibaca ulang baris demi baris.
+- Keamanan: **PERBAIKI** — lihat B1. Positif: `/api/soal` memakai SELECT eksplisit tanpa `jawaban_benar`; SQL berparameter (pola `${baseQuery}` hanya menyisipkan fragmen statis); cookie `httpOnly`/`sameSite=lax`/`secure` di produksi; rate limit per NIS; cek Origin/Referer untuk POST.
+- Skema: `LULUS` — migrasi 001–003 bernomor, tanpa penghapusan data, 003 idempoten; ERD memuat kolom/tabel baru.
+- UI: `LULUS` menurut laporan Fase 2–4 (Playwright 360px); tidak diulang di R-FINAL.
+- Beban: `LULUS (belum diverifikasi ulang)` — laporan T6.3: 410 klien, 0 % error, p95 18 ms, 0 jawaban hilang. Dijalankan di mesin yang sama dengan server dan DB uji, bukan laptop sekolah.
+- Dokumen: `LULUS` dengan catatan M3.
+
+**Temuan**
+- **B1 PERBAIKI (BLOCKER) — otorisasi guru per mapel:** `routes/guru.js:264` (`POST /soal/edit/:id`) dan `:193` (`POST /soal/batch-tambah`) tidak memeriksa kepemilikan. Guru mana pun dapat mengubah soal/kunci jawaban (termasuk memindahkannya ke `ujian_id` lain) atau menyisipkan soal ke ujian guru lain dengan menebak ID. Rute essay sudah benar (`checkGuruPengampuUjian`); `GET /soal/hapus/:id` juga sudah benar. Perbaikan: pakai pola `JOIN pengajaran ... guru_id = ?` pada soal asal **dan** ujian tujuan, atau `checkGuruPengampuUjian`; tambah tes 403/redirect lintas guru.
+- **M1 PERBAIKI (MAJOR) — `batch-tambah` tanpa validasi:** `soal_pg`/`soal_menjodohkan`/`soal_essay` yang tidak ada membuat `for...of undefined` → 500 dengan `err.message` dikirim ke klien; insert berjalan tanpa transaksi (gagal di tengah = sebagian soal tersimpan).
+- **M2 MINOR — GET yang mengubah data:** `GET /guru/soal/hapus/:id` (dan rute hapus sejenis) lolos `verifySameOrigin` karena hanya memeriksa POST/PUT/DELETE/PATCH; `sameSite=lax` mengizinkan navigasi GET lintas situs. Ubah ke POST.
+- **M3 MINOR — default poin menyimpang dari D-004:** `routes/admin.js:185-204` dan `routes/guru.js:204,270-274` memakai `poin || 1` untuk PG/menjodohkan (seharusnya 2). Nilai tetap benar karena dinormalisasi, tetapi bobot salah bila poin dikosongkan.
+- **M4 MINOR — logika penilaian ganda:** `POST /api/simpan-jawaban` (rute lama, tak dipakai klien) membandingkan PG case-sensitive dan menjodohkan lewat `sort()` sendiri, berbeda dari `penilaianService`. Hapus rute atau delegasikan ke `cekJawaban*`.
+- **M5 MINOR — sisa UI essay lama:** `views/admin/soal.ejs:113` masih berlabel "kata kunci untuk essay" (bertentangan dengan D-006).
+- **M6 NOTE — `npm audit`:** `mysql2 <= 3.23.0` (tersarang di `express-mysql-session`) dan `uuid` (via `exceljs`). Kerentanan mysql2 mensyaratkan server MySQL jahat; `uuid` hanya bila `buf` diberikan. Risiko rendah untuk MySQL lokal; `--force` akan mengubah major dependensi, jadi ditunda (konsisten dengan T6.6).
+- **N1 NOTE — belum diverifikasi siapa pun:** HP fisik, Exambro/SEB sungguhan, uji beban di laptop sekolah, T6.5 (`BLOCKED` menunggu D-002), D-017 (menunggu sekolah).
+
+**Kesimpulan:** belum `LULUS` — B1 (BLOCKER) dan M1 (MAJOR) harus diperbaiki dulu. Setelah itu R-FINAL dapat ditutup; M2–M5 sebaiknya ikut dikerjakan karena kecil.
+
+**Perbaikan R-FINAL B1 + M1 (Claude, 2026-10-09):** `LULUS`.
+- `POST /guru/soal/edit/:id`: soal asal dan `ujian_id` tujuan wajib milik guru (query `pengajaran.guru_id` + `checkGuruPengampuUjian`); selain itu redirect "Soal tidak ditemukan", tanpa perubahan.
+- `POST /guru/soal/batch-tambah`: validasi bentuk data (array, `poin` bilangan bulat positif) → 400; non-pengampu → 403; semua insert dalam satu transaksi (rollback bila gagal); error 500 tidak lagi membocorkan `err.message` (dicatat via `logger`).
+- Tes baru `tests/guru_otorisasi_soal.test.js` (7): 4 gagal sebelum perbaikan, semua lulus sesudahnya; `npm test` 130/130.
+- Catatan jujur: tes #7 (atomik) berhenti di validasi 400 sebelum transaksi dimulai, jadi jalur `rollback` belum diuji langsung. M2–M5 masih terbuka.
+
+**Perbaikan R-FINAL M2–M5 (Claude, 2026-10-09):** `LULUS`.
+- M2: 8 rute `*/hapus/:id` (admin ×7, guru ×1) kini `POST`; tombol hapus di 8 view menjadi `<form method="post">` dengan konfirmasi `onsubmit` (tidak bersarang di form lain; semua view ter-compile EJS). Dengan begitu `verifySameOrigin` ikut melindungi aksi hapus.
+- M3: `utils/helper.poinDefault(tipe, poin)` (PG 2, menjodohkan 2, essay 4; nilai tak valid → default) dipakai di tambah/edit soal admin dan guru.
+- M4: `POST /api/simpan-jawaban` kini memakai `penilaianService.cekJawabanPG/cekJawabanMenjodohkan` lewat `hitungIsBenar` (tidak ada logika penilaian ganda lagi).
+- M5: label/placeholder "kata kunci essay" di `views/admin/soal.ejs` dihapus.
+- Tes baru `tests/rfinal_minor.test.js` (5, semuanya gagal sebelum perbaikan); `npm test` 135/135.
+- Belum diuji langsung: rute `simpan-jawaban` (tanpa tes endpoint; hanya lewat suite yang ada) dan klik tombol hapus di browser (Playwright tidak dijalankan).

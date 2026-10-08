@@ -4,6 +4,7 @@ const pool    = require('../models/db');
 const { isAdmin } = require('../middleware/auth');
 const bcrypt  = require('bcrypt');
 const monitorService = require('../services/monitorService');
+const { poinDefault } = require('../utils/helper');
 
 router.use(isAdmin);
 
@@ -45,7 +46,7 @@ router.post('/guru/tambah', async (req, res) => {
         res.redirect('/admin/guru?msg=Guru berhasil ditambahkan');
     } catch (err) { console.error(err); res.redirect('/admin/guru?error=Gagal menambahkan guru'); }
 });
-router.get('/guru/hapus/:id', async (req, res) => {
+router.post('/guru/hapus/:id', async (req, res) => {
     try { await pool.query('DELETE FROM guru WHERE id = ?', [req.params.id]); res.redirect('/admin/guru?msg=Guru berhasil dihapus'); }
     catch (err) { console.error(err); res.redirect('/admin/guru?error=Gagal hapus guru'); }
 });
@@ -74,7 +75,7 @@ router.post('/kelas/tambah', async (req, res) => {
     await pool.query('INSERT INTO kelas (nama_kelas) VALUES (?)', [req.body.nama_kelas]);
     res.redirect('/admin/kelas');
 });
-router.get('/kelas/hapus/:id', async (req, res) => {
+router.post('/kelas/hapus/:id', async (req, res) => {
     await pool.query('DELETE FROM kelas WHERE id = ?', [req.params.id]);
     res.redirect('/admin/kelas');
 });
@@ -96,7 +97,7 @@ router.post('/mapel/tambah', async (req, res) => {
     await pool.query('INSERT INTO mata_pelajaran (nama_mapel) VALUES (?)', [req.body.nama_mapel]);
     res.redirect('/admin/mapel');
 });
-router.get('/mapel/hapus/:id', async (req, res) => {
+router.post('/mapel/hapus/:id', async (req, res) => {
     await pool.query('DELETE FROM mata_pelajaran WHERE id = ?', [req.params.id]);
     res.redirect('/admin/mapel');
 });
@@ -152,7 +153,7 @@ router.post('/ujian/edit/:id', async (req, res) => {
         res.redirect('/admin/ujian?msg=Ujian berhasil diupdate');
     } catch (err) { console.error(err); res.redirect(`/admin/ujian/edit/${req.params.id}?error=Gagal update ujian`); }
 });
-router.get('/ujian/hapus/:id', async (req, res) => {
+router.post('/ujian/hapus/:id', async (req, res) => {
     try { await pool.query('DELETE FROM ujian WHERE id = ?', [req.params.id]); res.redirect('/admin/ujian?msg=Ujian berhasil dihapus'); }
     catch (err) { console.error(err); res.redirect('/admin/ujian?error=Gagal menghapus ujian (masih terhubung dengan data lain)'); }
 });
@@ -182,9 +183,9 @@ router.post('/soal/tambah', async (req, res) => {
     const { ujian_id, tipe_soal, teks_soal, poin, pilihan_a, pilihan_b, pilihan_c, pilihan_d, jawaban_benar, opsi_tambahan } = req.body;
     try {
         if (tipe_soal === 'pg') {
-            await pool.query(`INSERT INTO soal (ujian_id, tipe_soal, teks_soal, poin, pilihan_a, pilihan_b, pilihan_c, pilihan_d, jawaban_benar) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, [ujian_id, tipe_soal, teks_soal, poin || 1, pilihan_a, pilihan_b, pilihan_c, pilihan_d, jawaban_benar]);
+            await pool.query(`INSERT INTO soal (ujian_id, tipe_soal, teks_soal, poin, pilihan_a, pilihan_b, pilihan_c, pilihan_d, jawaban_benar) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, [ujian_id, tipe_soal, teks_soal, poinDefault(tipe_soal, poin), pilihan_a, pilihan_b, pilihan_c, pilihan_d, jawaban_benar]);
         } else {
-            await pool.query(`INSERT INTO soal (ujian_id, tipe_soal, teks_soal, poin, jawaban_benar, opsi_tambahan) VALUES (?, ?, ?, ?, ?, ?)`, [ujian_id, tipe_soal, teks_soal, poin || 1, jawaban_benar, opsi_tambahan]);
+            await pool.query(`INSERT INTO soal (ujian_id, tipe_soal, teks_soal, poin, jawaban_benar, opsi_tambahan) VALUES (?, ?, ?, ?, ?, ?)`, [ujian_id, tipe_soal, teks_soal, poinDefault(tipe_soal, poin), jawaban_benar, opsi_tambahan]);
         }
         res.redirect('/admin/soal?msg=Soal berhasil ditambahkan');
     } catch (err) { console.error(err); res.redirect('/admin/soal?error=Gagal menambahkan soal'); }
@@ -199,14 +200,14 @@ router.post('/soal/edit/:id', async (req, res) => {
     const { ujian_id, tipe_soal, teks_soal, poin, pilihan_a, pilihan_b, pilihan_c, pilihan_d, jawaban_benar, opsi_tambahan } = req.body;
     try {
         if (tipe_soal === 'pg') {
-            await pool.query(`UPDATE soal SET ujian_id=?, tipe_soal=?, teks_soal=?, poin=?, pilihan_a=?, pilihan_b=?, pilihan_c=?, pilihan_d=?, jawaban_benar=? WHERE id=?`, [ujian_id, tipe_soal, teks_soal, poin || 1, pilihan_a, pilihan_b, pilihan_c, pilihan_d, jawaban_benar, req.params.id]);
+            await pool.query(`UPDATE soal SET ujian_id=?, tipe_soal=?, teks_soal=?, poin=?, pilihan_a=?, pilihan_b=?, pilihan_c=?, pilihan_d=?, jawaban_benar=? WHERE id=?`, [ujian_id, tipe_soal, teks_soal, poinDefault(tipe_soal, poin), pilihan_a, pilihan_b, pilihan_c, pilihan_d, jawaban_benar, req.params.id]);
         } else {
-            await pool.query(`UPDATE soal SET ujian_id=?, tipe_soal=?, teks_soal=?, poin=?, jawaban_benar=?, opsi_tambahan=? WHERE id=?`, [ujian_id, tipe_soal, teks_soal, poin || 1, jawaban_benar, opsi_tambahan, req.params.id]);
+            await pool.query(`UPDATE soal SET ujian_id=?, tipe_soal=?, teks_soal=?, poin=?, jawaban_benar=?, opsi_tambahan=? WHERE id=?`, [ujian_id, tipe_soal, teks_soal, poinDefault(tipe_soal, poin), jawaban_benar, opsi_tambahan, req.params.id]);
         }
         res.redirect('/admin/soal?msg=Soal berhasil diupdate');
     } catch (err) { console.error(err); res.redirect(`/admin/soal/edit/${req.params.id}?error=Gagal update soal`); }
 });
-router.get('/soal/hapus/:id', async (req, res) => {
+router.post('/soal/hapus/:id', async (req, res) => {
     try { await pool.query('DELETE FROM soal WHERE id = ?', [req.params.id]); res.redirect('/admin/soal?msg=Soal berhasil dihapus'); }
     catch (err) { console.error(err); res.redirect('/admin/soal?error=Gagal hapus soal'); }
 });
@@ -252,7 +253,7 @@ router.post('/pengajaran/tambah', async (req, res) => {
         res.redirect('/admin/pengajaran?msg=Berhasil ditambahkan');
     } catch (err) { console.error(err); res.redirect('/admin/pengajaran?error=Gagal menambahkan (mungkin sudah ada)'); }
 });
-router.get('/pengajaran/hapus/:id', async (req, res) => {
+router.post('/pengajaran/hapus/:id', async (req, res) => {
     try { await pool.query('DELETE FROM pengajaran WHERE id = ?', [req.params.id]); res.redirect('/admin/pengajaran?msg=Berhasil dihapus'); }
     catch (err) { console.error(err); res.redirect('/admin/pengajaran?error=Gagal menghapus data'); }
 });
@@ -318,7 +319,7 @@ router.post('/siswa/tambah', async (req, res) => {
     } catch (err) { console.error(err); res.redirect('/admin/siswa?error=Gagal menambahkan siswa (NIS mungkin sudah ada)'); }
 });
 
-router.get('/siswa/hapus/:id', async (req, res) => {
+router.post('/siswa/hapus/:id', async (req, res) => {
     try { await pool.query('DELETE FROM siswa WHERE id = ?', [req.params.id]); res.redirect('/admin/siswa?msg=Siswa berhasil dihapus'); }
     catch (err) { console.error(err); res.redirect('/admin/siswa?error=Gagal hapus siswa, mungkin masih terhubung dengan data ujian'); }
 });
