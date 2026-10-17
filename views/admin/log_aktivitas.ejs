@@ -1,0 +1,110 @@
+<%- include('../partials/header', { title: 'Log Aktivitas Admin' }) %>
+<%- include('../partials/sidebar_admin') %>
+
+<div class="container-fluid">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-journal-text"></i> Log Aktivitas Admin</h1>
+    </div>
+
+    <!-- Filter Data -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 bg-primary text-white">
+            <h6 class="m-0 font-weight-bold"><i class="bi bi-funnel"></i> Filter Data</h6>
+        </div>
+        <div class="card-body">
+            <form method="GET" action="/admin/log-aktivitas" class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label>Entitas</label>
+                    <select name="entitas" class="form-select">
+                        <option value="">Semua Entitas</option>
+                        <% entitasList.forEach(e => { %>
+                            <option value="<%= e.entitas %>" <%= filterEntitas === e.entitas ? 'selected' : '' %>><%= e.entitas %></option>
+                        <% }) %>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label>Aksi</label>
+                    <select name="aksi" class="form-select">
+                        <option value="">Semua Aksi</option>
+                        <option value="tambah" <%= filterAksi === 'tambah' ? 'selected' : '' %>>Tambah</option>
+                        <option value="edit" <%= filterAksi === 'edit' ? 'selected' : '' %>>Edit</option>
+                        <option value="hapus" <%= filterAksi === 'hapus' ? 'selected' : '' %>>Hapus</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100"><i class="bi bi-search"></i> Filter</button>
+                </div>
+                <div class="col-md-2">
+                    <a href="/admin/log-aktivitas" class="btn btn-secondary w-100"><i class="bi bi-arrow-repeat"></i> Reset</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Notifikasi -->
+    <% if (msg) { %>
+        <div class="alert alert-success alert-dismissible fade show"><%= msg %><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+    <% } %>
+    <% if (error) { %>
+        <div class="alert alert-danger alert-dismissible fade show"><%= error %><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+    <% } %>
+
+    <!-- Tabel Log Aktivitas -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Riwayat Aksi Admin (<%= total %> total)</h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover" width="100%" cellspacing="0">
+                    <thead>
+                        <tr>
+                            <th>Waktu</th>
+                            <th>Admin</th>
+                            <th>Aksi</th>
+                            <th>Entitas</th>
+                            <th>Detail</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% logs.forEach(l => {
+                            const badgeClass = l.aksi === 'tambah' ? 'bg-success' : (l.aksi === 'edit' ? 'bg-warning' : 'bg-danger');
+                        %>
+                        <tr>
+                            <td class="text-nowrap"><small><%= new Date(l.dibuat_pada).toLocaleString() %></small></td>
+                            <td><%= l.admin_username || '(akun dihapus)' %></td>
+                            <td><span class="badge <%= badgeClass %>"><%= l.aksi %></span></td>
+                            <td><%= l.entitas %><% if (l.entitas_id) { %> #<%= l.entitas_id %><% } %></td>
+                            <td><%= l.detail || '-' %></td>
+                        </tr>
+                        <% }) %>
+                        <% if (logs.length === 0) { %>
+                        <tr><td colspan="5" class="text-center">Belum ada aktivitas tercatat</td></tr>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <% if (totalPages > 1) { %>
+            <nav aria-label="Page navigation" class="mt-4">
+                <ul class="pagination justify-content-center">
+                    <li class="page-item <%= currentPage === 1 ? 'disabled' : '' %>">
+                        <a class="page-link" href="?page=<%= currentPage-1 %><%= filterEntitas ? '&entitas='+filterEntitas : '' %><%= filterAksi ? '&aksi='+filterAksi : '' %>">Previous</a>
+                    </li>
+                    <% for (let i = 1; i <= totalPages; i++) { %>
+                        <li class="page-item <%= i === currentPage ? 'active' : '' %>">
+                            <a class="page-link" href="?page=<%= i %><%= filterEntitas ? '&entitas='+filterEntitas : '' %><%= filterAksi ? '&aksi='+filterAksi : '' %>"><%= i %></a>
+                        </li>
+                    <% } %>
+                    <li class="page-item <%= currentPage === totalPages ? 'disabled' : '' %>">
+                        <a class="page-link" href="?page=<%= currentPage+1 %><%= filterEntitas ? '&entitas='+filterEntitas : '' %><%= filterAksi ? '&aksi='+filterAksi : '' %>">Next</a>
+                    </li>
+                </ul>
+            </nav>
+            <% } %>
+        </div>
+    </div>
+</div>
+
+<%- include('../partials/footer') %>
