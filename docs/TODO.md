@@ -258,6 +258,36 @@ Kolom **Dep** = item yang harus `DONE` lebih dulu. **Owner** `G` = Gemini, `U` =
 - Status: `DONE` (2026-10-09; lihat "Hasil review" → R-FINAL)
 
 ---
+## Fase 7 — Pelengkap menu guru & pengalaman ujian siswa
+
+**Konteks (Claude, 2026-10-17):** audit menyeluruh menu guru, admin, dan ujian siswa menemukan backend/anti-curang siswa sudah solid (diuji end-to-end: login, timer, sinkron jawaban, deteksi kecurangan, ambil-alih sesi — tidak ada bug). Tiga celah konkret berikut ditemukan dan **tidak** bertentangan dengan keputusan Final di [DECISION.md](DECISION.md).
+
+**Di luar lingkup Fase ini — JANGAN dikerjakan:** dashboard pemantauan real-time untuk guru. **D-019 (Final)** secara eksplisit membatasi pemantauan hanya untuk admin di v1. Jika menurut Anda keputusan ini perlu ditinjau ulang, tulis usulan di "Catatan eksekutor" dan **berhenti** — jangan diimplementasikan (RULES_AI §1.3).
+
+### T7.1 Guru: ganti password sendiri — Owner: G — Dep: T0.3
+- Saat ini guru hanya bisa diubah datanya (termasuk password) oleh **admin** (`/admin/guru/edit/:id`); tidak ada cara bagi guru mengganti password miliknya sendiri.
+- Tambah `GET /guru/profil` dan `POST /guru/profil` di `routes/guru.js` (ikuti pola middleware `isGuru` yang sudah dipakai di file itu). View baru `views/guru/profil.ejs` (ikuti gaya `views/guru/dashboard.ejs`); tambah link "Profil Saya" di `views/partials/sidebar_guru.ejs`.
+- Form: `password_lama`, `password_baru`, `konfirmasi_baru`. Validasi server: `bcrypt.compare(password_lama, guru.password)` harus cocok sebelum apa pun diubah; `password_baru.length >= 6` (konsisten dengan validasi guru yang sudah ada di `routes/admin.js` — cari `'Password guru minimal 6 karakter'`); `password_baru === konfirmasi_baru`. Hash dengan `bcrypt.hash(password_baru, 10)`.
+- Jangan ubah field lain (nip/nama/username) di halaman ini — itu tetap domain admin.
+- **Terima:** password lama salah → ditolak, password tidak berubah di DB; password baru < 6 karakter → ditolak; konfirmasi tidak cocok → ditolak; kombinasi benar → berhasil, login dengan password lama gagal setelahnya, login dengan password baru berhasil. Test baru `tests/guru_profil.test.js` memverifikasi keempat skenario lewat HTTP nyata (ikuti pola harness di `tests/akun_admin.test.js`, ganti login-admin dengan login-guru).
+- Status: `DONE`
+
+### T7.2 Guru: export daftar soal ke Excel — Owner: G — Dep: T0.4
+- Guru punya import batch soal (`POST /guru/soal/batch-tambah`) tapi tidak ada export — tidak simetris, dan guru tidak punya cara mengunduh bank soalnya sendiri sebagai cadangan/dokumentasi.
+- Tambah `GET /guru/kelola-soal/export` di `routes/guru.js`, letakkan dekat `GET /guru/kelola-soal`. **Wajib** pakai otorisasi per-guru yang sama seperti rute `kelola-soal`/`hasil-siswa` di file itu (`JOIN pengajaran pg ON ... WHERE pg.guru_id = ?`) — soal guru lain tidak boleh ikut terekspor meski ujian_id ditebak lewat parameter apa pun.
+- Dukung filter `?ujian=<id>` opsional, sama seperti halaman `kelola-soal`. Kolom Excel: Ujian, Tipe Soal, Teks Soal, Poin, Pilihan A–D, Jawaban Benar (pakai `ExcelJS` yang sudah di-import di file ini, ikuti gaya `hasil-siswa/export`).
+- Tambah tombol "Export Soal" di `views/guru/kelola_soal.ejs` di samping tombol "Tambah Soal (Batch)" yang sudah ada.
+- **Terima:** guru A mengekspor hanya melihat soal miliknya; guru B tidak bisa mendapatkan soal guru A lewat endpoint ini dengan parameter apa pun (403/kosong, bukan 500); file terunduh valid (`Content-Type` spreadsheet, ukuran > 0). Test baru `tests/guru_export_soal.test.js` (pola HTTP real seperti test lain di atas), minimal: ekspor berhasil untuk pemilik, ekspor ujian guru lain ditolak/kosong, akses tanpa login ditolak.
+- Status: `DONE`
+
+### T7.3 Siswa: tandai soal ragu-ragu di navigator — Owner: G — Dep: T1.7
+- Navigator soal (`views/ujian.ejs`, elemen `#navPanel`/`#navGrid`) saat ini hanya punya 2 status: "Dijawab" dan "Belum". Tambah status ketiga "Ragu-ragu" agar siswa bisa menandai soal yang ingin ditinjau ulang sebelum mengumpulkan — fitur umum di aplikasi CBT, murni bantuan visual untuk siswa.
+- **Batasi lingkup dengan tegas:** ini **hanya** state UI di sisi klien, **tidak** dikirim ke server, **tidak** ada endpoint/kolom DB baru, dan **tidak boleh** mengubah logika "Dijawab" yang sudah ada (soal yang dijawab dan ditandai ragu-ragu tetap tercatat terjawab seperti sekarang). Simpan status tanda di `localStorage`, key diberi namespace per siswa+ujian (misal `ragu_<siswaId>_<ujianId>`) supaya tidak bercampur kalau siswa lain login di perangkat yang sama.
+- Ubah `public/js/ujian.js` (cari fungsi yang mengisi `#navGrid`/`progressBar`, ±baris 81-130) untuk merender tombol kecil "tandai ragu-ragu" per soal (klik toggle) dan memberi kelas CSS baru pada sel navigator yang ditandai. Tambah entri legenda ketiga di `.nav-legend` (`views/ujian.ejs` ±baris 455-458) dengan warna berbeda dari "Dijawab"/"Belum" (gunakan variabel warna CSS yang sudah ada di file, misal `var(--warning)`, jangan hardcode warna baru tanpa alasan).
+- **Terima:** klik tombol tandai → warna titik navigator berubah jadi warna ketiga; klik lagi → tanda hilang; reload halaman → tanda tetap ada (dibaca dari `localStorage`); menandai soal yang sudah dijawab tidak menghapus status "Dijawab"-nya di server (cek `jawaban_siswa` tetap tersimpan seperti biasa); submit ujian tetap berjalan normal tanpa dipengaruhi tanda ragu-ragu. Karena ini murni UI tanpa endpoint baru untuk `node:test`, verifikasi lewat Playwright mengikuti pola `tests/ui/arab_hp.ui.js` (360×640 dan desktop): buat skrip baru `tests/ui/ragu_ragu.ui.js`, jalankan via `npm run test:ui` (tambahkan script jika belum ada run gabungan) dan sertakan hasilnya di "Laporan eksekusi".
+- Status: `DONE`
+
+---
 ## Catatan eksekutor
 _(Gemini: tulis ide/risiko di luar lingkup di sini; jangan dikerjakan.)_
 
@@ -458,6 +488,24 @@ _(Gemini: tulis ide/risiko di luar lingkup di sini; jangan dikerjakan.)_
 - Penyimpangan dari rencana: tidak ada.
 - Belum diverifikasi: tidak ada.
 
+### Laporan eksekusi T7.1
+- Diubah: `routes/guru.js`, `views/guru/profil.ejs` (dibuat), `views/partials/sidebar_guru.ejs`, `tests/guru_profil.test.js` (dibuat).
+- Verifikasi: `node --check routes/guru.js` bersih; `node --test tests/guru_profil.test.js` → 5/5 lulus (akses unauthenticated diarahkan ke /login-guru; password lama salah ditolak 302 dengan pesan error dan password DB tidak berubah; password baru < 6 karakter ditolak dengan pesan 'Password guru minimal 6 karakter'; konfirmasi password berbeda ditolak; kombinasi valid berhasil mengupdate password ter-hash bcrypt, login lama gagal, dan login baru berhasil).
+- Penyimpangan dari rencana: tidak ada.
+- Belum diverifikasi: tidak ada.
+
+### Laporan eksekusi T7.2
+- Diubah: `routes/guru.js`, `views/guru/kelola_soal.ejs`, `tests/guru_export_soal.test.js` (dibuat).
+- Verifikasi: `node --check routes/guru.js` bersih; tombol "Export Soal" terpasang di samping "Tambah Soal (Batch)" dengan parameter filter ujian dinamis; `node --test tests/guru_export_soal.test.js` → 4/4 lulus (unauthenticated redirect /login-guru; guru pemilik berhasil mengekspor file Excel valid > 0 bytes dengan kolom Ujian, Tipe Soal, Teks Soal, Poin, Pilihan A–D, Jawaban Benar; filter ?ujian=<id> mengekspor soal ujian terkait; guru lain yang mencoba mengakses ujian guru lain tidak mendapatkan bocoran soal/menghasilkan 0 data tanpa 500 server error).
+- Penyimpangan dari rencana: tidak ada.
+- Belum diverifikasi: tidak ada.
+
+### Laporan eksekusi T7.3
+- Diubah: `views/ujian.ejs`, `public/js/ujian.js`, `package.json`, `tests/ui/ragu_ragu.ui.js` (dibuat).
+- Verifikasi: `node --check public/js/ujian.js` bersih; kelas CSS `.nav-btn.ragu`, `.nav-dot.ragu`, `.btn-ragu-toggle` (memakai `var(--warning)`) dan entri legenda ketiga Ragu-ragu ditambahkan; tombol toggle ragu-ragu dirender di header kartu soal; status ragu-ragu tersimpan di `localStorage` ber-namespace `ragu_<siswaId>_<ujianId>` tanpa mengubah status "Dijawab" atau request ke server; pembersihan storage saat submit selesai; pengujian otomatis browser Playwright (`npm run test:ui`) → 24/24 lulus (17/17 suite `arab_hp.ui.js` + 7/7 suite `ragu_ragu.ui.js` di layar mobile 360×640 dan desktop 1280×720: legenda 3 status, toggle titik warna warning, persistensi localStorage setelah reload, status ganda answered+ragu, integritas penyimpanan jawaban di server DB `jawaban_siswa`, serta submit ujian normal hingga sesi berstatus `selesai`).
+- Penyimpangan dari rencana: tidak ada.
+- Belum diverifikasi: tidak ada.
+
 ## Hasil review
 _(Claude: per item `LULUS` / `PERBAIKI (BLOCKER|MAJOR|MINOR)` + bukti.)_
 
@@ -571,3 +619,18 @@ Dijalankan sendiri: `npm test` 123/123 lulus (32 suites). `npm audit`: 7 temuan 
 - Verifikasi akhir: `npm test` 139/139; `test:ui` 17/17; `test:ui:monitor` 7/7.
 - Tambahan di luar daftar TODO: landing page `GET /` (`views/landing.ejs`, `tests/landing.test.js`) — dicek di 360px (tanpa scroll horizontal, kartu ≥ 67 px).
 - **Belum diverifikasi / terbuka:** uji beban 410 klien tidak dijalankan ulang oleh reviewer (angka T6.3 berasal dari laporan eksekutor); tombol hapus (form POST) belum diklik di browser; HP fisik dan Exambro/SEB; T6.5 `BLOCKED` menunggu D-002; D-017 menunggu sekolah.
+
+### Review Fase 7 (Claude, 2026-10-18)
+Dijalankan sendiri: `npm test` 187/190 lulus (3 gagal **sebelum** Fase 7 juga gagal dengan alasan sama — `backup_restore.test.js`, `execFileSync` tidak bisa menjalankan `.sh` langsung di Windows native tanpa prefix `bash`; lingkungan, bukan regresi Fase 7). Percobaan pertama saya terhadap `guru_profil.test.js`/`guru_export_soal.test.js` tanpa `--test-concurrency=1` menunjukkan 8 gagal palsu (race antar file test terhadap `cbt_sekolah_test` yang sama); diulang dengan flag yang benar (sesuai `package.json`) → 9/9 lulus, cocok dengan klaim laporan eksekutor.
+- **T7.1: `LULUS`.** `routes/guru.js` (`GET`/`POST /guru/profil`) dibaca penuh: `bcrypt.compare` password lama wajib cocok sebelum apa pun ditulis, panjang password baru ≥ 6 (konsisten konvensi guru yang sudah ada), konfirmasi dicocokkan, hash `bcrypt.hash(...,10)`. `tests/guru_profil.test.js` 5/5 lulus saat saya jalankan ulang; skenario password-lama-salah terbukti tidak mengubah hash di DB.
+- **T7.2: `LULUS`.** Otorisasi per-guru benar — query dasar selalu `JOIN pengajaran pg ... WHERE pg.guru_id = ?` sebelum filter `?ujian=` opsional ditambahkan, sehingga ID ujian guru lain tidak pernah bisa dicocokkan. `tests/guru_export_soal.test.js` 4/4 lulus; termasuk kasus guru lain mendapat sheet kosong, bukan 500.
+- **T7.3: `LULUS`.** Scope dijaga ketat sesuai batasan di item (murni `localStorage`, tidak ada endpoint/kolom DB baru, tidak mengubah logika "Dijawab"). `tests/ui/ragu_ragu.ui.js` dijalankan langsung oleh saya (bukan hanya baca laporan): 7/7 lulus. Saya sempat curiga warna navigator tidak berubah (`getComputedStyle` terbaca `rgb(250,251,255)` = warna default) saat menguji manual dengan skrip Playwright terpisah — ternyata false alarm dari skrip saya sendiri yang membaca computed style sebelum transisi CSS 0.18 detik selesai; setelah menunggu, warna terbukti benar `rgb(230,119,0)` = `var(--warning)`.
+- **MINOR (berlaku utuk T7.1–T7.3):** `docs/DESIGN.md` tidak diperbarui untuk tiga perilaku/endpoint baru (`GET`/`POST /guru/profil`, `GET /guru/kelola-soal/export`, navigator ragu-ragu di UI ujian), padahal RULES_AI §6 "Definisi Selesai" mewajibkan ini saat perilaku/API berubah. `docs/ERD.md` benar tidak disentuh (tidak ada migrasi/skema baru di Fase 7, sesuai rencana).
+- **NOTE:** nama assertion `tests/ui/ragu_ragu.ui.js:93` ("...menjadi warna warning") hanya memeriksa `classList` (`isBtnRagu && isNavRagu`), bukan nilai `getComputedStyle` — tidak salah (class adalah syarat yang tepat untuk diuji otomatis), tapi labelnya sedikit menyiratkan lebih dari yang benar-benar diperiksa.
+
+**Kesimpulan:** `LULUS` — tidak ada BLOCKER/MAJOR. Satu MINOR terbuka (pembaruan `DESIGN.md`) sebelum Fase 7 ditutup penuh sesuai "Definisi Selesai".
+
+**Perbaikan MINOR Fase 7 (Claude, 2026-10-18):** `LULUS`.
+- `docs/DESIGN.md`: tambah §3.8 (profil guru & ekspor bank soal — T7.1/T7.2), dua baris baru di tabel kontrak API §4 (`GET`/`POST /guru/profil`, `GET /guru/kelola-soal/export`), dan satu baris di §5 Antarmuka untuk navigator ragu-ragu (T7.3), menegaskan statusnya murni `localStorage` sisi klien.
+- `docs/ERD.md` tetap tidak diubah (tidak ada migrasi/skema baru di Fase 7).
+- **Penutupan Fase 7:** semua item (T7.1–T7.3) `LULUS` tanpa catatan terbuka.

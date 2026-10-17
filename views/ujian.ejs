@@ -261,10 +261,15 @@
         .nav-btn{ width:100%; aspect-ratio:1; border-radius:var(--radius-sm); border:1.5px solid #e2e5ec; background:#fafbff; font-family:var(--font-heading); font-weight:700; font-size:.7rem; cursor:pointer; transition:all .18s; display:flex; align-items:center; justify-content:center; color:#2d3142; -webkit-tap-highlight-color:transparent; }
         .nav-btn:hover   { border-color:var(--primary); background:var(--primary-light); color:var(--primary); }
         .nav-btn.answered{ background:var(--primary); border-color:var(--primary); color:#fff; }
+        .nav-btn.ragu    { background:var(--warning) !important; border-color:var(--warning) !important; color:#fff !important; }
         .nav-legend{ display:flex; flex-wrap:wrap; gap:6px; margin-top:.8rem; }
         .nav-legend-item{ display:flex; align-items:center; gap:4px; font-size:.67rem; font-weight:600; color:#74788d; }
         .nav-dot{ width:10px; height:10px; border-radius:3px; border:1.5px solid #e2e5ec; }
         .nav-dot.answered{ background:var(--primary); border-color:var(--primary); }
+        .nav-dot.ragu    { background:var(--warning); border-color:var(--warning); }
+        .btn-ragu-toggle { font-size: .75rem; padding: .2rem .55rem; border-radius: var(--radius-sm); border: 1.5px solid var(--warning); color: var(--warning); background: transparent; cursor: pointer; transition: all .18s; display: inline-flex; align-items: center; gap: .35rem; font-weight: 600; }
+        .btn-ragu-toggle:hover { background: var(--warning-light); }
+        .btn-ragu-toggle.is-ragu { background: var(--warning); color: #fff; }
 
         /* Submit */
         .btn-selesai{ width:100%; margin-top:1rem; background:linear-gradient(135deg,var(--success),#12b886); color:#fff; border:none; border-radius:var(--radius-sm); padding:.75rem 1rem; font-family:var(--font-heading); font-size:.9rem; font-weight:700; cursor:pointer; transition:all .22s; box-shadow:0 3px 12px rgba(var(--success-rgb),.3); display:flex; align-items:center; justify-content:center; gap:.5rem; }
@@ -454,6 +459,7 @@
             <div class="nav-grid" id="navGrid"></div>
             <div class="nav-legend">
                 <div class="nav-legend-item"><div class="nav-dot answered"></div> Dijawab</div>
+                <div class="nav-legend-item"><div class="nav-dot ragu"></div> Ragu-ragu</div>
                 <div class="nav-legend-item"><div class="nav-dot"></div> Belum</div>
             </div>
         </div>

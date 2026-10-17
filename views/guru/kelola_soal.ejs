@@ -5,6 +5,9 @@
     <div class="d-sm-flex align-items-center justify-content-between mb-4">
         <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-question-circle"></i> Kelola Soal</h1>
         <div>
+            <a href="/guru/kelola-soal/export<%= filterUjian ? '?ujian=' + filterUjian : '' %>" class="btn btn-outline-success shadow-sm me-2">
+                <i class="bi bi-file-earmark-excel"></i> Export Soal
+            </a>
             <a href="/guru/kelola-soal/tambah-batch" class="btn btn-success shadow-sm me-2">
                 <i class="bi bi-table"></i> Tambah Soal Batch
             </a>

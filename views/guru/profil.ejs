@@ -1,0 +1,84 @@
+<%- include('../partials/header', { title: 'Profil Guru' }) %>
+<%- include('../partials/sidebar_guru') %>
+
+<div class="container-fluid">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-person-circle"></i> Profil Saya</h1>
+        <div>
+            <span class="badge bg-success fs-6 p-2"><i class="bi bi-person-badge"></i> <%= guru.nama %></span>
+        </div>
+    </div>
+
+    <!-- Notifikasi -->
+    <% if (msg) { %>
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="bi bi-check-circle me-1"></i> <%= msg %>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    <% } %>
+    <% if (error) { %>
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle me-1"></i> <%= error %>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    <% } %>
+
+    <div class="row">
+        <!-- Informasi Profil (Read-Only) -->
+        <div class="col-lg-5 mb-4">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary"><i class="bi bi-info-circle"></i> Data Guru</h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label text-muted small text-uppercase fw-bold">NIP</label>
+                        <input type="text" class="form-control bg-light" value="<%= guru.nip %>" readonly disabled>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-muted small text-uppercase fw-bold">Nama Lengkap</label>
+                        <input type="text" class="form-control bg-light" value="<%= guru.nama %>" readonly disabled>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-muted small text-uppercase fw-bold">Username</label>
+                        <input type="text" class="form-control bg-light" value="<%= guru.username %>" readonly disabled>
+                    </div>
+                    <div class="alert alert-info small mb-0">
+                        <i class="bi bi-shield-lock-fill"></i> Data NIP, Nama, dan Username hanya dapat diubah oleh Administrator Sekolah.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Form Ubah Password -->
+        <div class="col-lg-7 mb-4">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary"><i class="bi bi-key-fill"></i> Ganti Password</h6>
+                </div>
+                <div class="card-body">
+                    <form action="/guru/profil" method="POST">
+                        <div class="mb-3">
+                            <label for="password_lama" class="form-label">Password Lama <span class="text-danger">*</span></label>
+                            <input type="password" class="form-control" id="password_lama" name="password_lama" required placeholder="Masukkan password saat ini">
+                        </div>
+                        <div class="mb-3">
+                            <label for="password_baru" class="form-label">Password Baru <span class="text-danger">*</span></label>
+                            <input type="password" class="form-control" id="password_baru" name="password_baru" minlength="6" required placeholder="Minimal 6 karakter">
+                            <div class="form-text">Password harus memiliki panjang minimal 6 karakter.</div>
+                        </div>
+                        <div class="mb-4">
+                            <label for="konfirmasi_baru" class="form-label">Konfirmasi Password Baru <span class="text-danger">*</span></label>
+                            <input type="password" class="form-control" id="konfirmasi_baru" name="konfirmasi_baru" minlength="6" required placeholder="Ulangi password baru">
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save"></i> Simpan Password Baru
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<%- include('../partials/footer') %>

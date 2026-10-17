@@ -1,11 +1,69 @@
 const express = require('express');
 const router = express.Router();
+const bcrypt = require('bcrypt');
 const pool = require('../models/db');
 const { isGuru } = require('../middleware/auth');
 const logger = require('../utils/logger');
 const { poinDefault } = require('../utils/helper');
 
 router.use(isGuru);
+
+// ==================== PROFIL GURU (T7.1) ====================
+router.get('/profil', async (req, res) => {
+    try {
+        const guruId = req.session.guruId;
+        const [guru] = await pool.query('SELECT id, nip, nama, username FROM guru WHERE id = ?', [guruId]);
+        if (guru.length === 0) {
+            return res.redirect('/logout-guru');
+        }
+        res.render('guru/profil', {
+            session: req.session,
+            guru: guru[0],
+            msg: req.query.msg || null,
+            error: req.query.error || null
+        });
+    } catch (err) {
+        logger.error(err.message);
+        res.status(500).send('Terjadi kesalahan server');
+    }
+});
+
+router.post('/profil', async (req, res) => {
+    const guruId = req.session.guruId;
+    const { password_lama, password_baru, konfirmasi_baru } = req.body;
+
+    try {
+        if (!password_lama || !password_baru || !konfirmasi_baru) {
+            return res.redirect('/guru/profil?error=' + encodeURIComponent('Semua field harus diisi'));
+        }
+
+        const [rows] = await pool.query('SELECT password FROM guru WHERE id = ?', [guruId]);
+        if (rows.length === 0) {
+            return res.redirect('/logout-guru');
+        }
+
+        const match = await bcrypt.compare(String(password_lama), rows[0].password);
+        if (!match) {
+            return res.redirect('/guru/profil?error=' + encodeURIComponent('Password lama salah'));
+        }
+
+        if (typeof password_baru !== 'string' || password_baru.length < 6) {
+            return res.redirect('/guru/profil?error=' + encodeURIComponent('Password guru minimal 6 karakter'));
+        }
+
+        if (password_baru !== konfirmasi_baru) {
+            return res.redirect('/guru/profil?error=' + encodeURIComponent('Konfirmasi password tidak cocok'));
+        }
+
+        const hashed = await bcrypt.hash(password_baru, 10);
+        await pool.query('UPDATE guru SET password = ? WHERE id = ?', [hashed, guruId]);
+
+        res.redirect('/guru/profil?msg=' + encodeURIComponent('Password berhasil diperbarui'));
+    } catch (err) {
+        logger.error(err.message);
+        res.redirect('/guru/profil?error=' + encodeURIComponent('Gagal memperbarui password'));
+    }
+});
 
 // ==================== DASHBOARD GURU ====================
 router.get('/dashboard', async (req, res) => {
@@ -159,6 +217,84 @@ const [soal] = await pool.query(`
         msg: req.query.msg,
         error: req.query.error
     });
+});
+
+// Export daftar soal ke Excel (T7.2)
+router.get('/kelola-soal/export', async (req, res) => {
+    const guruId = req.session.guruId;
+    const filterUjian = req.query.ujian || '';
+
+    try {
+        let baseQuery = `
+            FROM soal s 
+            JOIN ujian u ON s.ujian_id = u.id 
+            JOIN pengajaran pg ON u.pengajaran_id = pg.id 
+            WHERE pg.guru_id = ?
+        `;
+        let params = [guruId];
+
+        if (filterUjian) {
+            baseQuery += ` AND s.ujian_id = ?`;
+            params.push(filterUjian);
+        }
+
+        const [soalList] = await pool.query(`
+            SELECT s.*, u.nama_ujian
+            ${baseQuery}
+            ORDER BY u.id ASC, s.id ASC
+        `, params);
+
+        const ExcelJS = require('exceljs');
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Bank Soal');
+
+        worksheet.columns = [
+            { header: 'Ujian', key: 'nama_ujian', width: 30 },
+            { header: 'Tipe Soal', key: 'tipe_soal', width: 15 },
+            { header: 'Teks Soal', key: 'teks_soal', width: 45 },
+            { header: 'Poin', key: 'poin', width: 10 },
+            { header: 'Pilihan A', key: 'pilihan_a', width: 25 },
+            { header: 'Pilihan B', key: 'pilihan_b', width: 25 },
+            { header: 'Pilihan C', key: 'pilihan_c', width: 25 },
+            { header: 'Pilihan D', key: 'pilihan_d', width: 25 },
+            { header: 'Jawaban Benar', key: 'jawaban_benar', width: 30 }
+        ];
+
+        soalList.forEach(s => {
+            let tipeLabel = s.tipe_soal ? s.tipe_soal.toUpperCase() : '-';
+            if (s.tipe_soal === 'pg') tipeLabel = 'Pilihan Ganda';
+            else if (s.tipe_soal === 'menjodohkan') tipeLabel = 'Menjodohkan';
+            else if (s.tipe_soal === 'essay') tipeLabel = 'Essay';
+
+            let jwbBenar = s.jawaban_benar || '-';
+            if (s.tipe_soal === 'pg' && s.jawaban_benar) {
+                jwbBenar = s.jawaban_benar.toUpperCase();
+            }
+
+            worksheet.addRow({
+                nama_ujian: s.nama_ujian,
+                tipe_soal: tipeLabel,
+                teks_soal: s.teks_soal,
+                poin: s.poin,
+                pilihan_a: s.pilihan_a || '-',
+                pilihan_b: s.pilihan_b || '-',
+                pilihan_c: s.pilihan_c || '-',
+                pilihan_d: s.pilihan_d || '-',
+                jawaban_benar: jwbBenar
+            });
+        });
+
+        worksheet.getRow(1).font = { bold: true };
+        worksheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1CC88A' } };
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename=daftar_soal_guru.xlsx');
+        await workbook.xlsx.write(res);
+        res.end();
+    } catch (err) {
+        logger.error(`Export soal guru gagal: ${err.message}`);
+        res.status(500).send('Gagal mengekspor soal');
+    }
 });
 
 // Halaman tambah soal (batch)

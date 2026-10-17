@@ -16,6 +16,7 @@ let ujianSudahSelesai  = false;
 // ─────────────────────────────────────────────
 const KEY_LOCAL_ANSWERS = `answers_${siswaId}_${ujianId}`;
 const KEY_QUEUE         = `sync_queue_${siswaId}_${ujianId}`;
+const KEY_RAGU          = `ragu_${siswaId}_${ujianId}`;
 
 const socket = io();
 
@@ -33,6 +34,42 @@ function getSyncQueue() {
 }
 function saveSyncQueue(q) {
     try { localStorage.setItem(KEY_QUEUE, JSON.stringify(q)); } catch {}
+}
+
+// ── State Ragu-ragu (T7.3) ──
+function getRaguList() {
+    try { return JSON.parse(localStorage.getItem(KEY_RAGU) || '[]'); }
+    catch { return []; }
+}
+function saveRaguList(list) {
+    try { localStorage.setItem(KEY_RAGU, JSON.stringify(list)); } catch {}
+}
+function isRagu(soal_id) {
+    const sid = parseInt(soal_id, 10);
+    return getRaguList().includes(sid);
+}
+function toggleRagu(soal_id) {
+    const sid = parseInt(soal_id, 10);
+    let list = getRaguList();
+    if (list.includes(sid)) {
+        list = list.filter(id => id !== sid);
+    } else {
+        list.push(sid);
+    }
+    saveRaguList(list);
+    updateNavGrid();
+    updateRaguButtons();
+}
+function updateRaguButtons() {
+    document.querySelectorAll('.btn-ragu-toggle').forEach(btn => {
+        const sid = parseInt(btn.dataset.soalId, 10);
+        const ragu = isRagu(sid);
+        btn.classList.toggle('is-ragu', ragu);
+        const icon = btn.querySelector('i');
+        if (icon) {
+            icon.className = ragu ? 'bi bi-flag-fill' : 'bi bi-flag';
+        }
+    });
 }
 
 function isAnswered(soal_id) {
@@ -94,7 +131,9 @@ function updateNavGrid() {
     const grid = document.getElementById('navGrid');
     if (!grid) return;
     grid.querySelectorAll('.nav-btn').forEach(btn => {
-        btn.classList.toggle('answered', isAnswered(btn.dataset.soalId));
+        const sid = parseInt(btn.dataset.soalId, 10);
+        btn.classList.toggle('answered', isAnswered(sid));
+        btn.classList.toggle('ragu', isRagu(sid));
     });
 }
 function buildNavGrid(soalList) {
@@ -103,7 +142,12 @@ function buildNavGrid(soalList) {
     grid.innerHTML = '';
     soalList.forEach((soal, idx) => {
         const btn = document.createElement('button');
-        btn.className    = 'nav-btn' + (isAnswered(soal.id) ? ' answered' : '');
+        const answered = isAnswered(soal.id);
+        const ragu = isRagu(soal.id);
+        let cls = 'nav-btn';
+        if (answered) cls += ' answered';
+        if (ragu) cls += ' ragu';
+        btn.className    = cls;
         btn.textContent  = idx + 1;
         btn.dataset.soalId = soal.id;
         btn.addEventListener('click', () => {
@@ -398,7 +442,12 @@ function renderSoal(soalList) {
 
         let html = `
             <div class="soal-header">
-                <span class="soal-number">Soal ${idx + 1}</span>
+                <div style="display:flex;align-items:center;gap:.6rem;">
+                    <span class="soal-number">Soal ${idx + 1}</span>
+                    <button type="button" class="btn-ragu-toggle${isRagu(soal.id) ? ' is-ragu' : ''}" data-soal-id="${soal.id}" title="Tandai ragu-ragu">
+                        <i class="bi ${isRagu(soal.id) ? 'bi-flag-fill' : 'bi-flag'}"></i> <span class="ragu-label">Ragu-ragu</span>
+                    </button>
+                </div>
                 <span class="soal-poin"><i class="bi bi-star-fill"></i> ${soal.poin} poin</span>
             </div>
             <div class="soal-text${soalArClass}" dir="auto" style="white-space:pre-wrap">${escapeHtml(soal.teks_soal)}</div>
@@ -578,6 +627,7 @@ async function selesaiUjian() {
         // Bersihkan data ujian ini dari storage
         localStorage.removeItem(KEY_LOCAL_ANSWERS);
         localStorage.removeItem(KEY_QUEUE);
+        localStorage.removeItem(KEY_RAGU);
 
         if (data.nilai !== undefined) {
             alert(
@@ -668,6 +718,16 @@ document.addEventListener('visibilitychange', () => {
         // Tab aktif kembali: resinkron timer dan flush antrean jawaban
         resinkronTimer();
         kirimAntrian();
+    }
+});
+
+// ── Tombol Tandai Ragu-ragu (T7.3) ──
+document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.btn-ragu-toggle');
+    if (btn) {
+        e.preventDefault();
+        const sid = btn.dataset.soalId;
+        toggleRagu(sid);
     }
 });
 

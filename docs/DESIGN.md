@@ -92,6 +92,10 @@ Job server tiap 30 detik: untuk sesi `sedang_ujian` dengan `NOW() > batas_waktu 
 - Pengunci utama di HP adalah **Exambro** (atau SEB di laptop) yang membuka URL aplikasi (D-011). Aplikasi tidak mengklaim bisa mendeteksi HP kedua.
 - Acak soal/pilihan per siswa memakai `seed` di DB.
 
+### 3.8 Profil guru dan ekspor bank soal (T7.1, T7.2)
+- Guru mengganti password miliknya sendiri lewat `GET`/`POST /guru/profil`, tanpa melalui admin. Password lama wajib diverifikasi (`bcrypt.compare`) sebelum password baru (≥ 6 karakter, sama seperti validasi guru di `routes/admin.js`) disimpan. NIP/nama/username tetap hanya bisa diubah admin.
+- `GET /guru/kelola-soal/export` mengunduh bank soal milik guru yang login ke Excel (kolom: Ujian, Tipe Soal, Teks Soal, Poin, Pilihan A–D, Jawaban Benar), dengan filter `?ujian=<id>` opsional. Otorisasi memakai pola yang sama dengan `kelola-soal`/`hasil-siswa`: query selalu melalui `JOIN pengajaran pg ... WHERE pg.guru_id = ?`, sehingga `ujian_id` milik guru lain tidak pernah cocok meski ditebak lewat parameter.
+
 ## 4. Kontrak API (target)
 | Method | Path | Auth | Fungsi |
 |--------|------|------|--------|
@@ -106,6 +110,8 @@ Job server tiap 30 detik: untuk sesi `sedang_ujian` dengan `NOW() > batas_waktu 
 | POST | `/admin/api/sesi/:id/tambah-waktu` | admin | `{menit}` |
 | POST | `/admin/api/sesi/:id/paksa-selesai` | admin | Finalisasi paksa |
 | GET/POST | `/guru/essay/:ujianId` | guru pengampu | Form/simpan nilai essay (+ impor Excel) |
+| GET/POST | `/guru/profil` | guru | Lihat profil; ganti password sendiri (verifikasi password lama) |
+| GET | `/guru/kelola-soal/export` | guru pengampu | Unduh bank soal milik guru ke Excel, filter `?ujian=` opsional |
 
 `/api/simpan-jawaban` (lama) dipertahankan sementara sebagai pembungkus ke logika yang sama, lalu dihapus setelah klien baru lolos review.
 
@@ -114,6 +120,7 @@ Job server tiap 30 detik: untuk sesi `sedang_ujian` dengan `NOW() > batas_waktu 
 - **Responsif**: target 360×640; tombol minimal 44px; tidak ada scroll horizontal.
 - **Essay**: kartu bacaan bertanda "Dijawab di lembar kertas"; tanpa textarea.
 - **Indikator**: status sinkron, sisa waktu, jumlah soal terjawab.
+- **Navigator soal**: 3 status — Dijawab, Ragu-ragu (tombol tandai per soal, T7.3), Belum. Tanda ragu-ragu murni bantuan visual sisi klien (`localStorage`, ber-namespace per siswa+ujian), tidak dikirim ke server dan tidak memengaruhi status "Dijawab" atau penilaian.
 - **Admin monitor**: tabel dengan filter kelas dan status, penanda warna, aksi per baris.
 
 ## 6. Keamanan
