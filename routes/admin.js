@@ -395,6 +395,45 @@ router.get('/siswa/template', async (req, res) => {
     }
 });
 
+// Export daftar siswa terdaftar ke Excel (PIN tidak diikutkan: tersimpan sebagai hash satu-arah)
+router.get('/siswa/export', async (req, res) => {
+    try {
+        const filterKelas = req.query.kelas || '';
+        let query = 'SELECT s.nis, s.nama, s.kelas, s.created_at FROM siswa s';
+        const params = [];
+        if (filterKelas) { query += ' WHERE s.kelas = ?'; params.push(filterKelas); }
+        query += ' ORDER BY s.kelas, s.nama';
+        const [siswa] = await pool.query(query, params);
+
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Siswa');
+        worksheet.columns = [
+            { header: 'NIS', key: 'nis', width: 15 },
+            { header: 'Nama', key: 'nama', width: 30 },
+            { header: 'Kelas', key: 'kelas', width: 15 },
+            { header: 'Terdaftar Sejak', key: 'created_at', width: 20 }
+        ];
+        siswa.forEach(s => {
+            worksheet.addRow({
+                nis: s.nis,
+                nama: s.nama,
+                kelas: s.kelas,
+                created_at: s.created_at ? new Date(s.created_at).toLocaleString() : '-'
+            });
+        });
+        worksheet.getRow(1).font = { bold: true };
+        worksheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4E73DF' } };
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename=daftar_siswa.xlsx');
+        await workbook.xlsx.write(res);
+        res.end();
+    } catch (err) {
+        logger.error(`Export siswa error: ${err.message}`);
+        res.redirect('/admin/siswa?error=Gagal mengekspor daftar siswa');
+    }
+});
+
 // Import Excel — FIX #7: hash PIN dari Excel
 router.post('/siswa/import', uploadMiddleware, async (req, res) => {
     if (!req.file) return res.redirect('/admin/siswa?error=File tidak ditemukan');
