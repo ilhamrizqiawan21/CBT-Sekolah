@@ -1002,4 +1002,82 @@ router.get('/hasil/cetak/:ujianId', async (req, res) => {
     } catch (err) { logger.error(err.message); res.status(500).send('Terjadi kesalahan'); }
 });
 
+// ============================================================
+// AKUN ADMIN
+// ============================================================
+const USERNAME_ADMIN_REGEX = /^[A-Za-z0-9._-]{3,50}$/;
+
+router.get('/akun', async (req, res) => {
+    const [akun] = await pool.query('SELECT id, username, created_at FROM admin ORDER BY username');
+    res.render('admin/akun', { akun, sessionAdminId: req.session.adminId, msg: req.query.msg, error: req.query.error });
+});
+
+router.post('/akun/tambah', async (req, res) => {
+    const { username, password } = req.body;
+    if (typeof username !== 'string' || !USERNAME_ADMIN_REGEX.test(username)) {
+        return res.redirect('/admin/akun?error=' + encodeURIComponent('Username 3-50 karakter (huruf, angka, titik, garis bawah, strip)'));
+    }
+    if (typeof password !== 'string' || password.length < 8) {
+        return res.redirect('/admin/akun?error=' + encodeURIComponent('Password admin minimal 8 karakter'));
+    }
+    try {
+        const hashed = await bcrypt.hash(password, 10);
+        await pool.query('INSERT INTO admin (username, password) VALUES (?, ?)', [username, hashed]);
+        res.redirect('/admin/akun?msg=Akun admin berhasil ditambahkan');
+    } catch (err) {
+        logger.error(err.message);
+        if (err.code === 'ER_DUP_ENTRY') {
+            return res.redirect('/admin/akun?error=' + encodeURIComponent('Username sudah dipakai'));
+        }
+        res.redirect('/admin/akun?error=Gagal menambahkan akun admin');
+    }
+});
+
+router.post('/akun/edit/:id', async (req, res) => {
+    const { id } = req.params;
+    const { username, password } = req.body;
+    if (typeof username !== 'string' || !USERNAME_ADMIN_REGEX.test(username)) {
+        return res.redirect('/admin/akun?error=' + encodeURIComponent('Username 3-50 karakter (huruf, angka, titik, garis bawah, strip)'));
+    }
+    if (password && password.trim() !== '' && password.trim().length < 8) {
+        return res.redirect('/admin/akun?error=' + encodeURIComponent('Password admin minimal 8 karakter'));
+    }
+    try {
+        if (password && password.trim() !== '') {
+            const hashed = await bcrypt.hash(password.trim(), 10);
+            await pool.query('UPDATE admin SET username=?, password=? WHERE id=?', [username, hashed, id]);
+        } else {
+            await pool.query('UPDATE admin SET username=? WHERE id=?', [username, id]);
+        }
+        if (parseInt(id, 10) === req.session.adminId) {
+            req.session.adminNama = username;
+        }
+        res.redirect('/admin/akun?msg=Akun admin berhasil diupdate');
+    } catch (err) {
+        logger.error(err.message);
+        if (err.code === 'ER_DUP_ENTRY') {
+            return res.redirect('/admin/akun?error=' + encodeURIComponent('Username sudah dipakai'));
+        }
+        res.redirect('/admin/akun?error=Gagal update akun admin');
+    }
+});
+
+router.post('/akun/hapus/:id', async (req, res) => {
+    const targetId = parseInt(req.params.id, 10);
+    if (targetId === req.session.adminId) {
+        return res.redirect('/admin/akun?error=' + encodeURIComponent('Tidak bisa menghapus akun Anda sendiri'));
+    }
+    try {
+        const [[{ total }]] = await pool.query('SELECT COUNT(*) as total FROM admin');
+        if (total <= 1) {
+            return res.redirect('/admin/akun?error=' + encodeURIComponent('Tidak bisa menghapus satu-satunya akun admin yang tersisa'));
+        }
+        await pool.query('DELETE FROM admin WHERE id = ?', [targetId]);
+        res.redirect('/admin/akun?msg=Akun admin berhasil dihapus');
+    } catch (err) {
+        logger.error(err.message);
+        res.redirect('/admin/akun?error=Gagal menghapus akun admin');
+    }
+});
+
 module.exports = router;

@@ -1,0 +1,137 @@
+<%- include('../partials/header', { title: 'Akun Admin' }) %>
+<%- include('../partials/sidebar_admin') %>
+
+<div class="container-fluid">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-shield-lock"></i> Akun Admin</h1>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#tambahAkunModal">
+            <i class="bi bi-plus-lg"></i> Tambah Akun Admin
+        </button>
+    </div>
+
+    <!-- Notifikasi -->
+    <% if (msg) { %>
+        <div class="alert alert-success alert-dismissible fade show"><%= msg %><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+    <% } %>
+    <% if (error) { %>
+        <div class="alert alert-danger alert-dismissible fade show"><%= error %><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+    <% } %>
+
+    <!-- Tabel Data Akun Admin -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Daftar Akun Admin</h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover" width="100%" cellspacing="0">
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>Dibuat</th>
+                            <th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% akun.forEach(a => { %>
+                        <tr>
+                            <td>
+                                <%= a.username %>
+                                <% if (a.id === sessionAdminId) { %><span class="badge bg-info">Anda</span><% } %>
+                            </td>
+                            <td><%= a.created_at ? new Date(a.created_at).toLocaleString() : '-' %></td>
+                            <td>
+                                <button class="btn btn-sm btn-warning btn-edit"
+                                    data-id="<%= a.id %>"
+                                    data-username="<%= a.username %>">
+                                    <i class="bi bi-pencil"></i> Edit
+                                </button>
+                                <% if (a.id !== sessionAdminId) { %>
+                                <form method="post" action="/admin/akun/hapus/<%= a.id %>" class="d-inline" onsubmit="return confirm('Yakin hapus akun admin ini?')"><button type="submit" class="btn btn-sm btn-danger">
+                                    <i class="bi bi-trash"></i> Hapus
+                                </button></form>
+                                <% } %>
+                            </td>
+                        </tr>
+                        <% }) %>
+                        <% if (akun.length === 0) { %>
+                        <tr><td colspan="3" class="text-center">Belum ada akun admin</td></tr>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Tambah Akun Admin -->
+<div class="modal fade" id="tambahAkunModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="/admin/akun/tambah" method="POST">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">Tambah Akun Admin</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label>Username</label>
+                        <input type="text" name="username" class="form-control" pattern="[A-Za-z0-9._-]{3,50}" title="3-50 karakter: huruf, angka, titik, garis bawah, strip" required>
+                    </div>
+                    <div class="mb-3">
+                        <label>Password</label>
+                        <input type="password" name="password" class="form-control" minlength="8" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary">Simpan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Edit Akun Admin -->
+<div class="modal fade" id="editAkunModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="editAkunForm" method="POST">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title">Edit Akun Admin</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="id" id="edit_id">
+                    <div class="mb-3">
+                        <label>Username</label>
+                        <input type="text" name="username" id="edit_username" class="form-control" pattern="[A-Za-z0-9._-]{3,50}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label>Password (kosongkan jika tidak diubah)</label>
+                        <input type="password" name="password" id="edit_password" class="form-control" minlength="8" placeholder="Biarkan kosong jika tidak ingin mengganti password">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-warning">Update</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.querySelectorAll('.btn-edit').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const id = this.dataset.id;
+            document.getElementById('edit_id').value = id;
+            document.getElementById('edit_username').value = this.dataset.username;
+            document.getElementById('edit_password').value = '';
+            document.getElementById('editAkunForm').action = `/admin/akun/edit/${id}`;
+            new bootstrap.Modal(document.getElementById('editAkunModal')).show();
+        });
+    });
+</script>
+
+<%- include('../partials/footer') %>
