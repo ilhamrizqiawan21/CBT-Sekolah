@@ -1,11 +1,12 @@
 const pool = require('../models/db');
 const bcrypt = require('bcrypt');
 const logger = require('../utils/logger');
+const { regenerateSession } = require('../utils/helper');
 
 exports.loginSiswa = async (req, res) => {
     const { nis, pin, ujian_id } = req.body;
 
-    if (!nis || !pin || !ujian_id) {
+    if (typeof nis !== 'string' || typeof pin !== 'string' || !nis || !pin || !ujian_id) {
         return res.render('login', { error: 'NIS, PIN, dan Ujian harus diisi' });
     }
 
@@ -99,7 +100,8 @@ exports.loginSiswa = async (req, res) => {
             logger.info(`Sesi siswa NIS ${siswaData.nis} untuk ujian ID ${ujian_id} diambil alih (${deviceType})`);
         }
 
-        // ── Simpan session ──
+        // ── Simpan session (ID sesi diganti saat login: cegah session fixation) ──
+        await regenerateSession(req);
         req.session.siswaId     = siswaData.id;
         req.session.siswaNama   = siswaData.nama;
         req.session.ujianId     = parseInt(ujian_id);

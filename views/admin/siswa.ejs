@@ -65,7 +65,7 @@
                                 <td><%= s.nis %></td>
                                 <td><%= s.nama %></td>
                                 <td><%= s.kelas || '-' %></td>
-                                <td><%= s.pin_ujian %></td>
+                                <td><span class="text-muted" title="PIN disimpan terenkripsi; ubah lewat tombol edit">••••</span></td>
                                 <td>
                                     <form method="post" action="/admin/siswa/hapus/<%= s.id %>" class="d-inline" onsubmit="return confirm('Yakin hapus siswa ini? Semua data ujiannya juga akan terhapus.')"><button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-trash"></i> Hapus</button></form>
                                 </td>
@@ -111,7 +111,7 @@
                     <div class="mb-3"><label>NIS <span class="text-danger">*</span></label><input type="text" name="nis" class="form-control" required></div>
                     <div class="mb-3"><label>Nama Lengkap <span class="text-danger">*</span></label><input type="text" name="nama" class="form-control" required></div>
                     <div class="mb-3"><label>Kelas</label><select name="kelas" class="form-select"><option value="">-- Pilih Kelas --</option><% kelasList.forEach(k => { %><option value="<%= k.nama_kelas %>"><%= k.nama_kelas %></option><% }) %></select></div>
-                    <div class="mb-3"><label>PIN Ujian</label><input type="text" name="pin_ujian" class="form-control" value="1234"></div>
+                    <div class="mb-3"><label>PIN Ujian</label><input type="text" name="pin_ujian" class="form-control" required minlength="4" placeholder="Minimal 4 karakter (jangan sama untuk semua siswa)"></div>
                 </div>
                 <div class="modal-footer"><button type="submit" class="btn btn-primary">Simpan</button></div>
             </form>

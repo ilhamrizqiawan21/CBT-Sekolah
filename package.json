@@ -13,7 +13,8 @@
     "test:ui:monitor": "node tests/ui/monitor.ui.js",
     "start:prod": "pm2 start ecosystem.config.js --env production",
     "backup": "bash scripts/backup.sh",
-    "loadtest": "node scripts/loadtest.js"
+    "loadtest": "node scripts/loadtest.js",
+    "create-admin": "node scripts/create-admin.js"
   },
   "keywords": [],
   "author": "",
@@ -29,12 +30,17 @@
     "express-rate-limit": "^8.7.1",
     "express-session": "^1.19.0",
     "multer": "^2.1.1",
-    "mysql2": "^3.22.3",
+    "mysql2": "^3.24.5",
     "socket.io": "^4.8.3",
     "winston": "^3.19.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.14",
-    "playwright": "^1.63.0"
+    "playwright": "^1.63.0",
+    "socket.io-client": "^4.8.3"
+  },
+  "overrides": {
+    "mysql2": "^3.24.5",
+    "uuid": "^11.1.1"
   }
 }

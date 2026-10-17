@@ -3,6 +3,10 @@ const bcrypt = require('bcrypt');
 require('dotenv').config();
 
 async function seedDevelopmentData() {
+    // Seed membuat akun dengan password yang diketahui publik (admin/admin123, guru/guru123, PIN 1234)
+    if (process.env.NODE_ENV === 'production') {
+        throw new Error('Seed data pengembangan tidak boleh dijalankan pada NODE_ENV=production. Buat admin dengan: node scripts/create-admin.js <username> <password>');
+    }
     const host = process.env.DB_HOST || '127.0.0.1';
     const user = process.env.DB_USER || 'root';
     const password = process.env.DB_PASSWORD || '';

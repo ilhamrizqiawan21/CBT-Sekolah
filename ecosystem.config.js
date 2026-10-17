@@ -14,11 +14,14 @@ module.exports = {
             merge_logs: true,
             env: {
                 NODE_ENV: 'development',
-                PORT: 3000
+                PORT: 3000,
+                TZ: 'Asia/Jakarta'
             },
             env_production: {
                 NODE_ENV: 'production',
-                PORT: 3000
+                PORT: 3000,
+                // Waktu aplikasi (Node) dan NOW() MySQL harus sama zona agar batas ujian akurat
+                TZ: 'Asia/Jakarta'
             }
         }
     ]

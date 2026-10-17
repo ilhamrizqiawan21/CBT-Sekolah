@@ -501,6 +501,18 @@ router.post('/simpan-jawaban', isSiswaAPI, async (req, res) => {
     }
 
     try {
+        // Batas waktu pribadi siswa (+ grace) berlaku juga di endpoint ini
+        const [sesiRows] = await pool.query(
+            'SELECT status, batas_waktu FROM sesi_ujian WHERE siswa_id = ? AND ujian_id = ?',
+            [siswa_id, ujian_id]
+        );
+        const izin = require('../services/sesiService').bolehTerimaJawaban(
+            sesiRows[0] ? { ...sesiRows[0] } : null, new Date(), new Date()
+        );
+        if (!izin.boleh) {
+            return res.status(403).json({ error: 'Waktu ujian Anda sudah habis' });
+        }
+
         // FIX #3 — Validasi soal_id MILIK ujian_id ini
         const [soal] = await pool.query(
             `SELECT tipe_soal, jawaban_benar, opsi_tambahan

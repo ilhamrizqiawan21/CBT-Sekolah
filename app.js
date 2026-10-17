@@ -1,3 +1,7 @@
+require('dotenv').config();
+const { validateEnv } = require('./utils/env');
+validateEnv();
+
 const express    = require('express');
 const session    = require('express-session');
 const MySQLStore = require('express-mysql-session')(session);
@@ -32,6 +36,13 @@ const sessionSocketMap = new Map();
 
 // ─── Middleware ───
 app.set('trust proxy', 1);
+app.disable('x-powered-by');
+app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.setHeader('Referrer-Policy', 'same-origin');
+    next();
+});
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -51,7 +62,11 @@ const sessionMiddleware = session({
     cookie: {
         httpOnly: true,
         sameSite: 'lax',
-        secure:   process.env.NODE_ENV === 'production',
+        // Default: aktif di production (butuh HTTPS). Untuk server LAN tanpa HTTPS,
+        // set COOKIE_SECURE=false agar cookie sesi tetap diterima peramban.
+        secure:   process.env.COOKIE_SECURE !== undefined
+                      ? process.env.COOKIE_SECURE === 'true'
+                      : process.env.NODE_ENV === 'production',
         maxAge:   1000 * 60 * 60 * 24
     }
 });
@@ -193,6 +208,16 @@ io.on('connection', (socket) => {
                 [siswa_id, ujian_id]
             );
 
+            // Perangkat/tab lama yang sesinya sudah diambil alih tidak boleh lagi
+            // mencatat pelanggaran atau mengakhiri ujian atas nama siswa.
+            if (sesiRows.length > 0 && sesiRows[0].device_token
+                && sess.deviceToken && sesiRows[0].device_token !== sess.deviceToken) {
+                sessionSocketMap.delete(socket.id);
+                socket.emit('error', { message: 'Sesi ujian Anda telah diambil alih di perangkat lain.', code: 409 });
+                socket.disconnect();
+                return;
+            }
+
             let sesi;
             if (sesiRows.length === 0) {
                 const hasil = await sesiService.mulaiAtauLanjut(siswa_id, ujian_id, validDeviceType, pool);
@@ -320,12 +345,15 @@ io.on('connection', (socket) => {
             const { siswa_id, ujian_id } = data;
             const pool = require('./models/db');
             try {
-                await pool.query(
-                    `UPDATE sesi_ujian
-                     SET status = 'selesai'
-                     WHERE siswa_id = ? AND ujian_id = ?`,
+                // Hanya sesi yang masih berjalan; menandai 'selesai' tanpa menghitung
+                // nilai akan membuat siswa tidak punya nilai sama sekali.
+                const [sesiAktif] = await pool.query(
+                    `SELECT status FROM sesi_ujian WHERE siswa_id = ? AND ujian_id = ?`,
                     [siswa_id, ujian_id]
                 );
+                if (sesiAktif.length > 0 && sesiAktif[0].status === 'sedang_ujian') {
+                    await require('./services/finalizeService').finalizeSesi(siswa_id, ujian_id, pool);
+                }
                 await monitorService.siarkanUpdateSiswa(io, ujian_id, siswa_id, pool, { event: 'selesai' });
             } catch (err) {
                 console.error('selesai-ujian update sesi error:', err);
@@ -356,61 +384,6 @@ io.on('connection', (socket) => {
 });
 
 // ─────────────────────────────────────────────────────────────
-// FIX #4 — Endpoint server-side untuk cek status pelanggaran.
-// Dipanggil oleh ujian.js secara periodik (polling ringan)
-// sebagai fallback ketika socket tidak bisa diandalkan.
-// Jika siswa disconnect socket lalu reconnect, statusnya
-// tetap terjaga di DB.
-// ─────────────────────────────────────────────────────────────
-app.get('/api/cek-status-ujian', async (req, res) => {
-    if (!req.session.siswaId || !req.session.ujianId) {
-        return res.status(401).json({ valid: false, reason: 'not_logged_in' });
-    }
-
-    const siswa_id = req.session.siswaId;
-    const ujian_id = req.session.ujianId;
-    const pool     = require('./models/db');
-
-    try {
-        // Cek waktu ujian masih valid
-        const isValid = await cekWaktuUjian(ujian_id);
-        if (!isValid) {
-            return res.json({ valid: false, reason: 'waktu_habis' });
-        }
-
-        // Cek status sesi (apakah sudah keluar_paksa)
-        const [sesiRow] = await pool.query(
-            `SELECT status FROM sesi_ujian
-             WHERE siswa_id = ? AND ujian_id = ?`,
-            [siswa_id, ujian_id]
-        );
-
-        if (sesiRow.length > 0 && sesiRow[0].status === 'keluar_paksa') {
-            return res.json({ valid: false, reason: 'keluar_paksa' });
-        }
-
-        // Kembalikan jumlah pelanggaran saat ini
-        const jumlah = await hitungTotalPelanggaran(pool, siswa_id, ujian_id);
-        const [ujianRow] = await pool.query(
-            `SELECT batas_pelanggaran FROM ujian WHERE id = ?`,
-            [ujian_id]
-        );
-        const batas = ujianRow[0]?.batas_pelanggaran || 3;
-
-        res.json({
-            valid:    true,
-            jumlah_pelanggaran: jumlah,
-            batas,
-            sisa:     Math.max(0, batas - jumlah)
-        });
-
-    } catch (err) {
-        console.error('cek-status-ujian error:', err);
-        res.status(500).json({ valid: false, reason: 'server_error' });
-    }
-});
-
-// ─────────────────────────────────────────────────────────────
 // Error handling
 // ─────────────────────────────────────────────────────────────
 app.use((req, res, next) => {
@@ -423,9 +396,11 @@ app.use((req, res, next) => {
 app.use((err, req, res, next) => {
     console.error('Server Error:', err);
     const isDevelopment = process.env.NODE_ENV === 'development';
-    res.status(err.status || 500).render('error', {
-        message: err.message || 'Terjadi kesalahan server. Silakan coba lagi nanti.',
-        error:   isDevelopment ? err : { status: err.status || 500 }
+    const status = err.status || 500;
+    const pesanAman = 'Terjadi kesalahan server. Silakan coba lagi nanti.';
+    res.status(status).render('error', {
+        message: (isDevelopment || status < 500) ? (err.message || pesanAman) : pesanAman,
+        error:   isDevelopment ? err : { status }
     });
 });
 
@@ -436,7 +411,8 @@ app.use((err, req, res, next) => {
 const { startAutoFinalizeJob } = require('./services/finalizeService');
 startAutoFinalizeJob(pool, 30000);
 
-server.listen(process.env.PORT, () => {
-    console.log(`Server berjalan di http://localhost:${process.env.PORT}`);
-    console.log(`Akses dari HP: http://<IP_komputer>:${process.env.PORT}`);
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+    console.log(`Server berjalan di http://localhost:${PORT}`);
+    console.log(`Akses dari HP: http://<IP_komputer>:${PORT}`);
 });

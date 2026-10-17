@@ -354,7 +354,7 @@ async function loadSoal() {
         if (c) c.innerHTML = `
             <div class="alert alert-danger text-center">
                 <i class="bi bi-exclamation-triangle-fill"></i>
-                Gagal memuat soal: ${err.message}<br>
+                Gagal memuat soal: ${escapeHtml(err.message)}<br>
                 <button class="btn btn-primary mt-3" onclick="location.reload()">Coba Lagi</button>
             </div>`;
     }
@@ -401,7 +401,7 @@ function renderSoal(soalList) {
                 <span class="soal-number">Soal ${idx + 1}</span>
                 <span class="soal-poin"><i class="bi bi-star-fill"></i> ${soal.poin} poin</span>
             </div>
-            <div class="soal-text${soalArClass}" dir="auto">${soal.teks_soal}</div>
+            <div class="soal-text${soalArClass}" dir="auto" style="white-space:pre-wrap">${escapeHtml(soal.teks_soal)}</div>
         `;
 
         const savedValue = local[soal.id];
@@ -415,10 +415,10 @@ function renderSoal(soalList) {
                 html += `
                     <div class="form-check" onclick="this.querySelector('input').click()">
                         <input class="form-check-input" type="radio"
-                               name="soal_${soal.id}" value="${p.key}"
+                               name="soal_${soal.id}" value="${escapeHtml(p.key)}"
                                id="q_${soal.id}_${p.key}" ${isChecked}>
                         <label class="form-check-label${choiceArClass}" for="q_${soal.id}_${p.key}" dir="auto">
-                            ${p.key}. ${p.text}
+                            ${escapeHtml(p.key)}. ${escapeHtml(p.text)}
                         </label>
                     </div>`;
             });
@@ -566,13 +566,14 @@ async function selesaiUjian() {
             method:      'POST',
             credentials: 'same-origin'
         });
-
-        if (!res.ok) {
-            const errData = await res.json().catch(() => ({}));
-            console.warn('selesai-ujian API error:', errData.error);
-        }
-
         const data = await res.json().catch(() => ({}));
+
+        // 403 = server sudah menutup sesi (selesai/waktu habis/dikunci pengawas): tidak ada yang bisa
+        // dikirim lagi. Selain itu, kegagalan (409/500/jaringan) BUKAN berarti selesai: jawaban lokal
+        // dipertahankan dan siswa diminta mencoba lagi agar nilai tidak hilang.
+        if (!res.ok && res.status !== 403) {
+            throw new Error(data.error || `HTTP ${res.status}`);
+        }
 
         // Bersihkan data ujian ini dari storage
         localStorage.removeItem(KEY_LOCAL_ANSWERS);
@@ -586,17 +587,35 @@ async function selesaiUjian() {
                 `Salah      : ${data.salah}\n` +
                 `Kosong     : ${data.kosong}`
             );
-        } else {
+        } else if (res.ok) {
             alert(`✅ Ujian selesai!\n\n${data.message || 'Jawaban terkirim'}`);
+        } else {
+            alert(`Ujian Anda sudah ditutup.\n\n${data.error || ''}`);
         }
 
         socket.emit('selesai-ujian');
         window.location.href = '/logout';
 
     } catch (e) {
-        console.error('selesaiUjian fetch error:', e);
-        socket.emit('selesai-ujian');
-        window.location.href = '/logout';
+        console.error('selesaiUjian error:', e);
+        ujianSudahSelesai = false;
+
+        // Waktu sudah habis: coba kirim ulang otomatis tanpa menampilkan dialog berulang
+        if (waktuTersisa <= 0) {
+            if (btnSelesai) btnSelesai.textContent = 'Mengirim ulang jawaban...';
+            setTimeout(selesaiUjian, 5000);
+            return;
+        }
+
+        alert('Jawaban belum berhasil dikirim (koneksi/server bermasalah). Jawaban Anda aman di perangkat ini. Periksa koneksi lalu tekan "Selesai & Kumpulkan" lagi, atau hubungi pengawas.');
+        if (btnSelesai) {
+            btnSelesai.disabled = false;
+            btnSelesai.innerHTML = '<i class="bi bi-check2-circle"></i> Selesai &amp; Kumpulkan';
+        }
+        startTimer(null, waktuTersisa);
+        startHeartbeat();
+        startResyncTimer();
+        startPolling();
     }
 }
 
