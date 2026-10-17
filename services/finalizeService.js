@@ -117,6 +117,16 @@ async function tutupSesiKadaluarsa(db = defaultPool, graceDetik = null) {
         [grace]
     );
 
+    // Pemulihan: sesi berstatus 'selesai' tetapi tidak punya nilai_ujian (mis. proses
+    // terhenti di tengah finalisasi). Tanpa ini siswa tidak akan pernah punya nilai.
+    const [tanpaNilai] = await db.query(
+        `SELECT s.siswa_id, s.ujian_id
+         FROM sesi_ujian s
+         LEFT JOIN nilai_ujian n ON n.siswa_id = s.siswa_id AND n.ujian_id = s.ujian_id
+         WHERE s.status = 'selesai' AND n.id IS NULL`
+    );
+    expiredSessions.push(...tanpaNilai);
+
     const hasil = [];
     for (const sesi of expiredSessions) {
         try {

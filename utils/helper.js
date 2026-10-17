@@ -25,4 +25,11 @@ function poinDefault(tipe, poin) {
     return tipe === 'essay' ? 4 : 2;
 }
 
-module.exports = { cekWaktuUjian, poinDefault };
+// Ganti ID sesi saat login agar ID sesi sebelum login (session fixation) tidak ikut berlaku.
+function regenerateSession(req) {
+    return new Promise((resolve, reject) => {
+        req.session.regenerate(err => (err ? reject(err) : resolve()));
+    });
+}
+
+module.exports = { cekWaktuUjian, poinDefault, regenerateSession };

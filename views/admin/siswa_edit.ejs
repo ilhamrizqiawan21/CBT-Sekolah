@@ -19,7 +19,7 @@
     </div>
     <div class="mb-3">
         <label>PIN Ujian</label>
-        <input type="text" name="pin_ujian" class="form-control" value="<%= siswa.pin_ujian %>">
+        <input type="text" name="pin_ujian" class="form-control" minlength="4" placeholder="Kosongkan jika PIN tidak diubah" autocomplete="off">
     </div>
     <button type="submit" class="btn btn-primary">Update</button>
     <a href="/admin/siswa" class="btn btn-secondary">Batal</a>

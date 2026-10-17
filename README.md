@@ -80,7 +80,12 @@ Lalu jalankan runner migrasi otomatis:
 npm run migrate
 ```
 
-4. Menjalankan Server:
+4. Buat akun admin pertama (seed `npm run seed` hanya untuk pengembangan dan menolak berjalan di production karena memakai password publik `admin123`/`guru123`/PIN `1234`):
+```bash
+npm run create-admin -- <username> <password-min-8-karakter>
+```
+
+5. Menjalankan Server:
 - Mode pengembangan:
 ```bash
 npm run dev
@@ -103,9 +108,10 @@ Pengujian otomatis menggunakan database uji terpisah `cbt_sekolah_test` agar tid
 ```sql
 CREATE DATABASE IF NOT EXISTS cbt_sekolah_test;
 ```
-2. Import skema ke database uji:
+2. Import skema ke database uji. `schema.sql` berisi `CREATE DATABASE cbt_sekolah` + `USE cbt_sekolah`, sehingga baris itu harus dibuang agar tabel masuk ke database uji (bukan database utama), lalu terapkan migrasi:
 ```bash
-mysql -u <user> -p cbt_sekolah_test < database/schema.sql
+sed '/^CREATE DATABASE/,/^USE/d' database/schema.sql | mysql -u <user> -p cbt_sekolah_test
+DB_NAME=cbt_sekolah_test npm run migrate
 ```
 3. Jalankan pengujian:
 ```bash
@@ -137,5 +143,8 @@ CBT-Sekolah/
 
 - Jangan commit berkas `.env` atau credential rahasia ke repository.
 - Selalu gunakan `SESSION_SECRET` yang panjang dan acak.
-- Pada lingkungan produksi, jalankan di balik HTTPS (`NODE_ENV=production` mengaktifkan secure cookie flag).
+- Pada lingkungan produksi, jalankan di balik HTTPS (`NODE_ENV=production` mengaktifkan secure cookie flag). Untuk server LAN tanpa HTTPS, set `COOKIE_SECURE=false` di `.env`, jika tidak login tidak akan berfungsi.
+- Server menolak menyala pada `NODE_ENV=production` bila `SESSION_SECRET` kurang dari 32 karakter atau masih berupa nilai contoh.
+- Seluruh aset tampilan (Bootstrap, ikon) disajikan lokal dari `public/vendor`, sehingga ujian tetap berjalan tanpa internet.
+- Jangan memberi PIN yang sama/mudah ditebak ke banyak siswa: siapa pun yang tahu NIS dan PIN siswa lain dapat mengambil alih sesinya.
 - Otorisasi dan validasi selalu diperiksa di sisi server (server-authoritative).

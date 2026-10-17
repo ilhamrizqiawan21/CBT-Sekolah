@@ -22,6 +22,15 @@ NODE_ENV=production
 TAMPILKAN_NILAI_SISWA=false
 ```
 
+> [!WARNING]
+> **Server LAN tanpa HTTPS** (akses lewat `http://192.168.x.x:3000`): tambahkan `COOKIE_SECURE=false` ke `.env`. Tanpa itu cookie sesi bertanda `Secure` ditolak peramban dan **tidak ada pengguna yang bisa login**.
+>
+> Aplikasi menolak menyala bila `SESSION_SECRET` < 32 karakter atau masih nilai contoh (production). Buat dengan `openssl rand -hex 32`.
+>
+> **Zona waktu**: setel zona waktu server/MySQL ke `Asia/Jakarta` (PM2 sudah memberi `TZ=Asia/Jakarta`; untuk MySQL gunakan `default-time-zone='+07:00'`). Selisih zona antara Node dan MySQL menggeser batas ujian.
+>
+> **Akun admin pertama**: `npm run create-admin -- <username> <password>` (jangan jalankan `npm run seed` di produksi).
+
 > [!IMPORTANT]
 > **Dampak `NODE_ENV=production`**:
 > 1. Cookie sesi Express akan secara otomatis mengaktifkan flag `secure: true`.

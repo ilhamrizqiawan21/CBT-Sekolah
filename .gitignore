@@ -3,6 +3,7 @@
 .env.*
 !.env.example
 vendor/
+!public/vendor/
 node_modules/
 **/node_modules/
 *.sql

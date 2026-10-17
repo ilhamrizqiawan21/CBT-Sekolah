@@ -342,7 +342,15 @@ router.post('/soal/hapus/:id', async (req, res) => {
 
 // Detail soal per ujian (API)
 router.get('/api/soal/:ujianId', async (req, res) => {
-    const [soal] = await pool.query('SELECT * FROM soal WHERE ujian_id = ?', [req.params.ujianId]);
+    const ujianId = parseInt(req.params.ujianId, 10);
+    if (!ujianId) return res.status(400).json({ error: 'ID ujian tidak valid' });
+
+    // Kunci jawaban hanya boleh dibaca guru pengampu ujian ini
+    const authCheck = await checkGuruPengampuUjian(ujianId, req.session.guruId);
+    if (!authCheck.exists) return res.status(404).json({ error: 'Ujian tidak ditemukan' });
+    if (!authCheck.authorized) return res.status(403).json({ error: 'Anda bukan guru pengampu ujian ini' });
+
+    const [soal] = await pool.query('SELECT * FROM soal WHERE ujian_id = ?', [ujianId]);
     res.json(soal);
 });
 
@@ -747,8 +755,8 @@ router.get('/essay', async (req, res) => {
             SELECT u.id, u.nama_ujian, mp.nama_mapel, k.nama_kelas, u.tanggal_mulai, u.tanggal_selesai,
                    COUNT(DISTINCT s.id) as jumlah_essay,
                    COUNT(DISTINCT nu.siswa_id) as total_peserta,
-                   SUM(CASE WHEN nu.status_koreksi = 'selesai' THEN 1 ELSE 0 END) as peserta_selesai,
-                   SUM(CASE WHEN nu.status_koreksi = 'menunggu_essay' THEN 1 ELSE 0 END) as peserta_menunggu
+                   COUNT(DISTINCT CASE WHEN nu.status_koreksi = 'selesai' THEN nu.siswa_id END) as peserta_selesai,
+                   COUNT(DISTINCT CASE WHEN nu.status_koreksi = 'menunggu_essay' THEN nu.siswa_id END) as peserta_menunggu
             FROM ujian u
             JOIN pengajaran pg ON u.pengajaran_id = pg.id
             JOIN mata_pelajaran mp ON pg.mapel_id = mp.id
