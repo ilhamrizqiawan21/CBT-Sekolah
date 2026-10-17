@@ -102,6 +102,22 @@ async function finalizeSesi(siswaId, ujianId, db = defaultPool) {
 }
 
 /**
+ * Finalisasi atas permintaan klien lewat socket. Hanya sesi `sedang_ujian` yang diproses
+ * (dinilai dulu, baru ditutup); sesi terkunci (`keluar_paksa`) atau yang sudah `selesai`
+ * dibiarkan agar keputusan tetap di admin (buka-kunci / paksa-selesai).
+ * Mengembalikan true bila sesi benar-benar difinalisasi.
+ */
+async function finalizeJikaBerjalan(siswaId, ujianId, db = defaultPool) {
+    const [rows] = await db.query(
+        'SELECT status FROM sesi_ujian WHERE siswa_id = ? AND ujian_id = ?',
+        [siswaId, ujianId]
+    );
+    if (rows.length === 0 || rows[0].status !== 'sedang_ujian') return false;
+    await finalizeSesi(siswaId, ujianId, db);
+    return true;
+}
+
+/**
  * Memeriksa dan memfinalisasi seluruh sesi yang telah melewati batas_waktu + grace period (D-009).
  */
 async function tutupSesiKadaluarsa(db = defaultPool, graceDetik = null) {
@@ -151,6 +167,7 @@ function startAutoFinalizeJob(db = defaultPool, intervalMs = 30000) {
 module.exports = {
     hitungUlangNilai,
     finalizeSesi,
+    finalizeJikaBerjalan,
     tutupSesiKadaluarsa,
     startAutoFinalizeJob
 };

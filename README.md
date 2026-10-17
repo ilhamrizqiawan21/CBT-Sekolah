@@ -91,9 +91,19 @@ npm start
 # atau menggunakan PM2 (rekomendasi produksi):
 npm run start:prod
 ```
+Untuk produksi, buat akun admin dengan `npm run create-admin -- --username=admin` (jangan `npm run seed`) dan set `COOKIE_SECURE=false` bila server diakses lewat HTTP di LAN.
+
 Panduan lengkap deployment, rotasi log, dan start-on-boot dapat dilihat di [Panduan Deployment](docs/DEPLOYMENT.md).
 
 Aplikasi dapat diakses melalui peramban di `http://localhost:3000`.
+
+### Mencoba dengan Docker (demo cepat)
+Tanpa memasang Node.js/MySQL, cukup Docker:
+```bash
+DEMO_SEED=true docker compose up --build
+docker compose logs app | grep -A5 "AKUN DEMO"   # akun demo acak (dicetak sekali)
+```
+Buka `http://localhost:3000` (atau `http://<IP_komputer>:3000` dari HP di jaringan yang sama). Untuk pemakaian nyata: jangan set `DEMO_SEED`, isi `SESSION_SECRET`, `DB_PASSWORD`, `DB_ROOT_PASSWORD` sendiri, lalu buat admin dengan `docker compose exec app npm run create-admin -- --username=admin`. Berkas ini belum diuji `docker build` di lingkungan pengembangan; skrip inisialisasinya (`scripts/docker-init.js`) sudah diuji terhadap MariaDB 10.11.
 
 ## Pengujian Otomatis (Automated Testing)
 

@@ -1,0 +1,51 @@
+# Menjalankan CBT Sekolah + MariaDB:  docker compose up --build
+# Buka http://localhost:3000 (atau http://<IP_komputer>:3000 dari HP di jaringan yang sama).
+# Akun demo (acak) dicetak di log:  docker compose logs app | grep -A5 "AKUN DEMO"
+services:
+  db:
+    image: mariadb:10.11
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: cbt_sekolah
+      MARIADB_USER: cbt_user
+      MARIADB_PASSWORD: ${DB_PASSWORD:-ganti-password-db}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-ganti-password-root}
+      TZ: Asia/Jakarta
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --default-time-zone=+07:00
+    volumes:
+      - dbdata:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      retries: 20
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      DB_HOST: db
+      DB_USER: cbt_user
+      DB_PASSWORD: ${DB_PASSWORD:-ganti-password-db}
+      DB_NAME: cbt_sekolah
+      # Wajib diganti untuk pemakaian nyata (minimal 32 karakter)
+      SESSION_SECRET: ${SESSION_SECRET:-ganti-dengan-string-acak-minimal-32-karakter-ya}
+      NODE_ENV: production
+      # Akses lewat HTTP di LAN: cookie secure harus dimatikan (lihat docs/DEPLOYMENT.md)
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      # true = buat data demo (akun acak dicetak di log). Jangan aktifkan untuk data sekolah sebenarnya.
+      DEMO_SEED: ${DEMO_SEED:-false}
+      TAMPILKAN_NILAI_SISWA: ${TAMPILKAN_NILAI_SISWA:-false}
+    volumes:
+      - uploads:/app/uploads
+      - logs:/app/logs
+
+volumes:
+  dbdata:
+  uploads:
+  logs:

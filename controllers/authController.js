@@ -1,6 +1,7 @@
 const pool = require('../models/db');
 const bcrypt = require('bcrypt');
 const logger = require('../utils/logger');
+const { mulaiSesi } = require('../utils/session');
 
 exports.loginSiswa = async (req, res) => {
     const { nis, pin, ujian_id } = req.body;
@@ -99,18 +100,16 @@ exports.loginSiswa = async (req, res) => {
             logger.info(`Sesi siswa NIS ${siswaData.nis} untuk ujian ID ${ujian_id} diambil alih (${deviceType})`);
         }
 
-        // ── Simpan session ──
-        req.session.siswaId     = siswaData.id;
-        req.session.siswaNama   = siswaData.nama;
-        req.session.ujianId     = parseInt(ujian_id);
-        req.session.siswaNis    = siswaData.nis;
-        req.session.deviceToken = hasilSesi.sesi.device_token;
-        req.session.deviceType  = deviceType;
-
-        req.session.save(err => {
-            if (err) logger.error(`Session save error: ${err.message}`);
-            res.redirect('/ujian');
+        // ── Simpan session (ID sesi diganti agar kebal session fixation) ──
+        await mulaiSesi(req, {
+            siswaId:     siswaData.id,
+            siswaNama:   siswaData.nama,
+            ujianId:     parseInt(ujian_id),
+            siswaNis:    siswaData.nis,
+            deviceToken: hasilSesi.sesi.device_token,
+            deviceType:  deviceType
         });
+        res.redirect('/ujian');
 
     } catch (err) {
         logger.error(`loginSiswa error: ${err.message}`, { stack: err.stack });

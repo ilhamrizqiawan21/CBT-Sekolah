@@ -35,11 +35,11 @@ module.exports = {
             }
 
             if (rows[0].status === 'keluar_paksa') {
-                return res.status(403).json({ error: 'Akses ujian telah dicabut karena pelanggaran' });
+                return res.status(403).json({ error: 'Akses ujian telah dicabut karena pelanggaran', code: 'keluar_paksa' });
             }
 
             if (rows[0].status === 'selesai') {
-                return res.status(403).json({ error: 'Ujian sudah selesai' });
+                return res.status(403).json({ error: 'Ujian sudah selesai', code: 'selesai' });
             }
 
             // Validasi device_token: bandingkan token klien/sesi dengan token aktif di database
