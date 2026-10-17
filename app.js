@@ -322,13 +322,11 @@ io.on('connection', (socket) => {
             const { siswa_id, ujian_id } = data;
             const pool = require('./models/db');
             try {
-                await pool.query(
-                    `UPDATE sesi_ujian
-                     SET status = 'selesai'
-                     WHERE siswa_id = ? AND ujian_id = ?`,
-                    [siswa_id, ujian_id]
-                );
-                await monitorService.siarkanUpdateSiswa(io, ujian_id, siswa_id, pool, { event: 'selesai' });
+                // Dinilai dan ditutup hanya bila masih berjalan; sesi terkunci tidak diubah
+                const ditutup = await require('./services/finalizeService').finalizeJikaBerjalan(siswa_id, ujian_id, pool);
+                if (ditutup) {
+                    await monitorService.siarkanUpdateSiswa(io, ujian_id, siswa_id, pool, { event: 'selesai' });
+                }
             } catch (err) {
                 logger.error(`selesai-ujian update sesi error: ${err.message}`, { stack: err.stack });
             }

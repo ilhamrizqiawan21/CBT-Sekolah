@@ -567,12 +567,20 @@ async function selesaiUjian() {
             credentials: 'same-origin'
         });
 
-        if (!res.ok) {
-            const errData = await res.json().catch(() => ({}));
-            console.warn('selesai-ujian API error:', errData.error);
+        const data = await res.json().catch(() => ({}));
+
+        // Sesi terkunci karena pelanggaran: jawaban BELUM dinilai, keputusan ada di pengawas.
+        // Data lokal dipertahankan agar tersinkron bila pengawas membuka kunci; tidak ada
+        // event selesai-ujian ke server dan siswa tidak diberi kesan ujiannya selesai.
+        if (res.status === 403 && data.code === 'keluar_paksa') {
+            alert('⚠️ Ujian Anda dikunci karena pelanggaran.\n\nJawaban Anda belum dinilai. Hubungi pengawas ruangan untuk melanjutkan atau menyelesaikan ujian.');
+            window.location.href = '/logout';
+            return;
         }
 
-        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            console.warn('selesai-ujian API error:', data.error);
+        }
 
         // Bersihkan data ujian ini dari storage
         localStorage.removeItem(KEY_LOCAL_ANSWERS);

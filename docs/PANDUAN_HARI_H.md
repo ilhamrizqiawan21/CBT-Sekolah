@@ -101,6 +101,7 @@ Jika ujian menggunakan token keamanan (fitur T5.3):
   2. Admin membuka dashboard monitor, cari baris nama siswa terkait.
   3. Klik tombol **"Buka Kunci"**.
   4. Status sesi siswa langsung pulih menjadi `sedang_ujian`, jatah pelanggaran di-reset dari titik tersebut, dan seluruh jawaban sebelumnya tetap tersimpan utuh.
+- **Yang dilihat siswa**: layar menampilkan "Ujian Anda dikunci karena pelanggaran. Jawaban Anda belum dinilai", bukan "Ujian selesai". Siswa yang terkunci **tidak dinilai otomatis**; admin memutuskan **Buka Kunci** (siswa login lagi dan melanjutkan) atau **Paksa Selesai** (jawaban dinilai sekarang). Jawaban yang belum sempat terkirim tetap di perangkat siswa dan terkirim setelah kunci dibuka.
 
 ### B. Perangkat Siswa Mati / Restart / Tertutup Browser
 - **Solusi**:
