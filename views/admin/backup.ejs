@@ -1,0 +1,67 @@
+<%- include('../partials/header', { title: 'Backup Database' }) %>
+<%- include('../partials/sidebar_admin') %>
+
+<div class="container-fluid">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-hdd-stack"></i> Backup Database</h1>
+        <form method="POST" action="/admin/backup/buat" onsubmit="return confirm('Buat backup database sekarang?')">
+            <button type="submit" class="btn btn-primary"><i class="bi bi-plus-lg"></i> Buat Backup Sekarang</button>
+        </form>
+    </div>
+
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i>
+        <strong>Pemulihan (restore) sengaja tidak tersedia di halaman ini</strong> — demi keamanan data sekolah,
+        memulihkan backup harus dilakukan lewat terminal server oleh orang yang memegang akses tersebut:
+        <pre class="mb-0 mt-2"><code>bash scripts/restore.sh --file=&lt;nama_berkas.sql.gz&gt; --confirm=TIMPA</code></pre>
+        Unduh berkas yang diinginkan dari daftar di bawah, lalu jalankan perintah di atas di server.
+    </div>
+
+    <!-- Notifikasi -->
+    <% if (msg) { %>
+        <div class="alert alert-success alert-dismissible fade show"><%= msg %><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+    <% } %>
+    <% if (error) { %>
+        <div class="alert alert-danger alert-dismissible fade show"><%= error %><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+    <% } %>
+
+    <!-- Tabel Daftar Backup -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Berkas Backup Tersedia</h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover" width="100%" cellspacing="0">
+                    <thead>
+                        <tr>
+                            <th>Nama Berkas</th>
+                            <th>Ukuran</th>
+                            <th>Dibuat</th>
+                            <th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% files.forEach(f => { %>
+                        <tr>
+                            <td><%= f.nama %></td>
+                            <td><%= (f.ukuran / 1024).toFixed(1) %> KB</td>
+                            <td><%= new Date(f.dibuat).toLocaleString() %></td>
+                            <td>
+                                <a href="/admin/backup/download/<%= encodeURIComponent(f.nama) %>" class="btn btn-sm btn-success">
+                                    <i class="bi bi-download"></i> Unduh
+                                </a>
+                            </td>
+                        </tr>
+                        <% }) %>
+                        <% if (files.length === 0) { %>
+                        <tr><td colspan="4" class="text-center">Belum ada berkas backup. Klik "Buat Backup Sekarang" untuk membuat yang pertama.</td></tr>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<%- include('../partials/footer') %>

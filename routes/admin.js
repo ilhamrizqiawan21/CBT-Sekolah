@@ -1083,6 +1083,59 @@ router.get('/hasil/cetak/:ujianId', async (req, res) => {
 });
 
 // ============================================================
+// BACKUP DATABASE (restore tetap CLI-only: scripts/restore.sh,
+// sengaja tidak diekspos lewat web demi keamanan data sekolah)
+// ============================================================
+const { execFile } = require('child_process');
+const BACKUP_DIR = process.env.BACKUP_DIR || path.join(__dirname, '..', 'backups');
+const BACKUP_FILENAME_REGEX = /^cbt_[A-Za-z0-9_]+_\d{8}_\d{6}\.sql(\.gz)?$/;
+
+router.get('/backup', async (req, res) => {
+    let files = [];
+    try {
+        if (fs.existsSync(BACKUP_DIR)) {
+            files = fs.readdirSync(BACKUP_DIR)
+                .filter(f => BACKUP_FILENAME_REGEX.test(f))
+                .map(f => {
+                    const stat = fs.statSync(path.join(BACKUP_DIR, f));
+                    return { nama: f, ukuran: stat.size, dibuat: stat.mtime };
+                })
+                .sort((a, b) => b.dibuat - a.dibuat);
+        }
+    } catch (err) {
+        logger.error(`Gagal membaca direktori backup: ${err.message}`);
+    }
+    res.render('admin/backup', { files, msg: req.query.msg, error: req.query.error });
+});
+
+router.post('/backup/buat', async (req, res) => {
+    const dbName = process.env.DB_NAME || 'cbt_sekolah';
+    const scriptPath = path.join(__dirname, '..', 'scripts', 'backup.sh');
+    execFile('bash', [scriptPath, `--db=${dbName}`, `--out-dir=${BACKUP_DIR}`, '--keep=30'], async (err, stdout, stderr) => {
+        if (err) {
+            logger.error(`Backup manual gagal: ${err.message} | stderr: ${stderr}`);
+            return res.redirect('/admin/backup?error=' + encodeURIComponent('Gagal membuat backup: ' + (stderr || err.message)));
+        }
+        await catatAktivitas(req.session.adminId, 'tambah', 'backup', null, 'Membuat backup database manual', pool);
+        res.redirect('/admin/backup?msg=' + encodeURIComponent('Backup berhasil dibuat'));
+    });
+});
+
+router.get('/backup/download/:filename', (req, res) => {
+    const filename = req.params.filename;
+    if (!BACKUP_FILENAME_REGEX.test(filename)) {
+        return res.redirect('/admin/backup?error=' + encodeURIComponent('Nama berkas tidak valid'));
+    }
+    const filePath = path.join(BACKUP_DIR, filename);
+    const resolvedBackupDir = path.resolve(BACKUP_DIR);
+    const resolvedFilePath = path.resolve(filePath);
+    if (!resolvedFilePath.startsWith(resolvedBackupDir + path.sep) || !fs.existsSync(resolvedFilePath)) {
+        return res.redirect('/admin/backup?error=' + encodeURIComponent('Berkas backup tidak ditemukan'));
+    }
+    res.download(resolvedFilePath, filename);
+});
+
+// ============================================================
 // LOG AKTIVITAS ADMIN
 // ============================================================
 router.get('/log-aktivitas', async (req, res) => {
