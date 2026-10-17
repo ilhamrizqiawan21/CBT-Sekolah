@@ -8,6 +8,14 @@ const pool       = require('./models/db');
 const monitorService = require('./services/monitorService');
 require('dotenv').config();
 
+const { validateEnv, cookieSecure } = require('./utils/validateEnv');
+const envErrors = validateEnv();
+if (envErrors.length > 0) {
+    console.error('[STARTUP] Konfigurasi .env tidak valid:');
+    envErrors.forEach(e => console.error(`  - ${e}`));
+    process.exit(1);
+}
+
 const app    = express();
 const server = http.createServer(app);
 const io     = socketIo(server);
@@ -51,7 +59,7 @@ const sessionMiddleware = session({
     cookie: {
         httpOnly: true,
         sameSite: 'lax',
-        secure:   process.env.NODE_ENV === 'production',
+        secure:   cookieSecure(),
         maxAge:   1000 * 60 * 60 * 24
     }
 });
@@ -436,7 +444,8 @@ app.use((err, req, res, next) => {
 const { startAutoFinalizeJob } = require('./services/finalizeService');
 startAutoFinalizeJob(pool, 30000);
 
-server.listen(process.env.PORT, () => {
-    console.log(`Server berjalan di http://localhost:${process.env.PORT}`);
-    console.log(`Akses dari HP: http://<IP_komputer>:${process.env.PORT}`);
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+    console.log(`Server berjalan di http://localhost:${PORT}`);
+    console.log(`Akses dari HP: http://<IP_komputer>:${PORT}`);
 });

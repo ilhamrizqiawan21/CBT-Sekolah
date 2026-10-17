@@ -3,6 +3,9 @@ const bcrypt = require('bcrypt');
 require('dotenv').config();
 
 async function seedDevelopmentData() {
+    if (process.env.NODE_ENV === 'production') {
+        throw new Error('Seed data contoh (admin/admin123, guru/guru123) tidak boleh dijalankan pada NODE_ENV=production. Gunakan: npm run create-admin');
+    }
     const host = process.env.DB_HOST || '127.0.0.1';
     const user = process.env.DB_USER || 'root';
     const password = process.env.DB_PASSWORD || '';
@@ -154,7 +157,10 @@ async function seedDevelopmentData() {
 if (require.main === module) {
     seedDevelopmentData()
         .then(() => process.exit(0))
-        .catch(() => process.exit(1));
+        .catch((err) => {
+            console.error('[SEED]', err.message);
+            process.exit(1);
+        });
 }
 
 module.exports = { seedDevelopmentData };

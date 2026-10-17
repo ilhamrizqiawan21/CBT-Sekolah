@@ -24,9 +24,18 @@ TAMPILKAN_NILAI_SISWA=false
 
 > [!IMPORTANT]
 > **Dampak `NODE_ENV=production`**:
-> 1. Cookie sesi Express akan secara otomatis mengaktifkan flag `secure: true`.
-> 2. Flag `secure: true` mensyaratkan koneksi HTTPS atau reverse proxy (Nginx / Caddy / Cloudflare Tunnel) dengan header `X-Forwarded-Proto: https`. Aplikasi telah menyertakan konfigurasi `app.set('trust proxy', 1)`.
+> 1. Cookie sesi Express mengaktifkan flag `secure: true` secara default, sehingga hanya dikirim lewat HTTPS (atau reverse proxy Nginx / Caddy / Cloudflare Tunnel dengan header `X-Forwarded-Proto: https`; aplikasi memakai `app.set('trust proxy', 1)`).
+> 2. **Jaringan sekolah tanpa HTTPS** (akses `http://<IP>:3000`): tambahkan `COOKIE_SECURE=false` di `.env`. Tanpa itu browser menolak cookie sesi dan **tidak ada yang bisa login**.
 > 3. Tampilan pesan stack trace error dimatikan demi keamanan.
+>
+> **Validasi startup**: aplikasi menolak berjalan (exit 1, pesan jelas) bila `SESSION_SECRET`, `DB_NAME`, atau `DB_USER` kosong, `PORT`/`COOKIE_SECURE` tidak valid, atau pada produksi `SESSION_SECRET` masih nilai contoh / kurang dari 32 karakter.
+
+### B. Akun Admin Pertama (Produksi)
+Jangan jalankan `npm run seed` di produksi (data contoh `admin/admin123`; skrip menolak jalan saat `NODE_ENV=production`). Buat admin sendiri:
+```bash
+npm run create-admin -- --username=admin
+```
+Password (minimal 8 karakter) dimasukkan lewat prompt tersembunyi, atau lewat env `ADMIN_PASSWORD` untuk mode non-interaktif. Tambahkan `--reset` untuk mengganti password admin yang sudah ada.
 
 ---
 
@@ -117,7 +126,8 @@ pm2 set pm2-logrotate:compress true
 
 - [ ] Node.js (v18+) dan MySQL/MariaDB aktif.
 - [ ] Database `cbt_sekolah` telah dimigrasi (`npm run migrate`).
-- [ ] Berkas `.env` disetel `NODE_ENV=production` dan `SESSION_SECRET` kuat.
+- [ ] Berkas `.env` disetel `NODE_ENV=production`, `SESSION_SECRET` kuat (≥ 32 karakter), dan `COOKIE_SECURE=false` bila tanpa HTTPS.
+- [ ] Akun admin dibuat dengan `npm run create-admin` (bukan `npm run seed`).
 - [ ] Aplikasi berjalan via PM2 (`pm2 status` menampilkan status `online`).
 - [ ] Konfigurasi `pm2 save` telah dijalankan untuk persistensi boot.
 

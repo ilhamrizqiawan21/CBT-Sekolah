@@ -91,6 +91,8 @@ npm start
 # atau menggunakan PM2 (rekomendasi produksi):
 npm run start:prod
 ```
+Untuk produksi, buat akun admin dengan `npm run create-admin -- --username=admin` (jangan `npm run seed`) dan set `COOKIE_SECURE=false` bila server diakses lewat HTTP di LAN.
+
 Panduan lengkap deployment, rotasi log, dan start-on-boot dapat dilihat di [Panduan Deployment](docs/DEPLOYMENT.md).
 
 Aplikasi dapat diakses melalui peramban di `http://localhost:3000`.

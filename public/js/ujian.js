@@ -354,7 +354,7 @@ async function loadSoal() {
         if (c) c.innerHTML = `
             <div class="alert alert-danger text-center">
                 <i class="bi bi-exclamation-triangle-fill"></i>
-                Gagal memuat soal: ${err.message}<br>
+                Gagal memuat soal: ${escapeHtml(err.message)}<br>
                 <button class="btn btn-primary mt-3" onclick="location.reload()">Coba Lagi</button>
             </div>`;
     }
@@ -401,7 +401,7 @@ function renderSoal(soalList) {
                 <span class="soal-number">Soal ${idx + 1}</span>
                 <span class="soal-poin"><i class="bi bi-star-fill"></i> ${soal.poin} poin</span>
             </div>
-            <div class="soal-text${soalArClass}" dir="auto">${soal.teks_soal}</div>
+            <div class="soal-text${soalArClass}" dir="auto">${escapeHtml(soal.teks_soal)}</div>
         `;
 
         const savedValue = local[soal.id];
@@ -418,7 +418,7 @@ function renderSoal(soalList) {
                                name="soal_${soal.id}" value="${p.key}"
                                id="q_${soal.id}_${p.key}" ${isChecked}>
                         <label class="form-check-label${choiceArClass}" for="q_${soal.id}_${p.key}" dir="auto">
-                            ${p.key}. ${p.text}
+                            ${p.key}. ${escapeHtml(p.text)}
                         </label>
                     </div>`;
             });
