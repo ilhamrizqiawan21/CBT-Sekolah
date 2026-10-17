@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../models/db');
 const authController = require('../controllers/authController');
+const logger = require('../utils/logger');
+const { mulaiSesi, cekPassword } = require('../utils/session');
 const {
     loginSiswaIpLimiter,
     loginSiswaNisLimiter,
@@ -76,18 +78,18 @@ router.get('/login-admin', (req, res) => {
 router.post('/login-admin', loginAdminLimiter, async (req, res) => {
     const { username, password } = req.body;
     const pool = require('../models/db');
-    const bcrypt = require('bcrypt');
-    const [admin] = await pool.query('SELECT * FROM admin WHERE username = ?', [username]);
-    if (admin.length === 0) {
-        return res.render('login-admin', { error: 'Username salah' });
+
+    try {
+        const [admin] = await pool.query('SELECT * FROM admin WHERE username = ?', [String(username || '')]);
+        if (!(await cekPassword(password, admin[0] && admin[0].password))) {
+            return res.render('login-admin', { error: 'Username atau password salah' });
+        }
+        await mulaiSesi(req, { adminId: admin[0].id, adminNama: admin[0].nama });
+        res.redirect('/admin/dashboard');
+    } catch (err) {
+        logger.error(`login-admin error: ${err.message}`, { stack: err.stack });
+        res.render('login-admin', { error: 'Terjadi kesalahan server' });
     }
-    const match = await bcrypt.compare(password, admin[0].password);
-    if (!match) {
-        return res.render('login-admin', { error: 'Password salah' });
-    }
-    req.session.adminId = admin[0].id;
-    req.session.adminNama = admin[0].nama;
-    res.redirect('/admin/dashboard');
 });
 
 router.get('/logout-admin', (req, res) => {
@@ -103,22 +105,16 @@ router.get('/login-guru', (req, res) => {
 router.post('/login-guru', loginGuruLimiter, async (req, res) => {
     const { username, password } = req.body;
     const pool = require('../models/db');
-    const bcrypt = require('bcrypt');
 
     try {
-        const [guru] = await pool.query('SELECT * FROM guru WHERE username = ?', [username]);
-        if (guru.length === 0) {
-            return res.render('login-guru', { error: 'Username tidak ditemukan' });
+        const [guru] = await pool.query('SELECT * FROM guru WHERE username = ?', [String(username || '')]);
+        if (!(await cekPassword(password, guru[0] && guru[0].password))) {
+            return res.render('login-guru', { error: 'Username atau password salah' });
         }
-        const match = await bcrypt.compare(password, guru[0].password);
-        if (!match) {
-            return res.render('login-guru', { error: 'Password salah' });
-        }
-        req.session.guruId = guru[0].id;
-        req.session.guruNama = guru[0].nama;
+        await mulaiSesi(req, { guruId: guru[0].id, guruNama: guru[0].nama });
         res.redirect('/guru/dashboard');
     } catch (err) {
-        console.error(err);
+        logger.error(`login-guru error: ${err.message}`, { stack: err.stack });
         res.render('login-guru', { error: 'Terjadi kesalahan server' });
     }
 });

@@ -6,6 +6,7 @@ const http       = require('http');
 const socketIo   = require('socket.io');
 const pool       = require('./models/db');
 const monitorService = require('./services/monitorService');
+const logger = require('./utils/logger');
 require('dotenv').config();
 
 const { validateEnv, cookieSecure } = require('./utils/validateEnv');
@@ -137,7 +138,6 @@ async function cekDanPaksaSubmit(pool, socket, siswa_id, ujian_id, jenisKecurang
 // Socket.IO
 // ─────────────────────────────────────────────────────────────
 io.on('connection', (socket) => {
-    console.log('Socket connected:', socket.id);
 
     // ── admin:join (DESIGN §3.6, T4.2) ──
     socket.on('admin:join', ({ ujian_id }) => {
@@ -161,7 +161,6 @@ io.on('connection', (socket) => {
         const sess = socket.request.session;
         const siswa_id = sess && sess.siswaId;
         const ujian_id = sess && sess.ujianId;
-        console.log('siswa-siap: ujian_id=%s siswa_id=%s device_type=%s', ujian_id, siswa_id, sess && sess.deviceType);
 
         if (!siswa_id || !ujian_id) {
             socket.emit('error', { message: 'Data siswa tidak valid' });
@@ -231,7 +230,7 @@ io.on('connection', (socket) => {
             await monitorService.siarkanUpdateSiswa(io, ujian_id, siswa_id, pool, { event: 'masuk' });
 
         } catch (err) {
-            console.error('siswa-siap error:', err);
+            logger.error(`siswa-siap error: ${err.message}`, { stack: err.stack });
             socket.emit('error', { message: 'Terjadi kesalahan server' });
         }
     });
@@ -242,7 +241,6 @@ io.on('connection', (socket) => {
     // FIX #5 — Menggunakan cekDanPaksaSubmit() yang hitung total gabungan.
     // T5.1 — Simpan device_type di log_kecurangan
     socket.on('pindah-tab', async () => {
-        console.log('pindah-tab dari socket:', socket.id);
         const data = sessionSocketMap.get(socket.id);
         if (!data) return;
         const { siswa_id, ujian_id, device_type } = data;
@@ -258,7 +256,7 @@ io.on('connection', (socket) => {
             await cekDanPaksaSubmit(pool, socket, siswa_id, ujian_id, 'pindah_tab');
             await monitorService.siarkanUpdateSiswa(io, ujian_id, siswa_id, pool, { event: 'pelanggaran' });
         } catch (err) {
-            console.error('pindah-tab error:', err);
+            logger.error(`pindah-tab error: ${err.message}`, { stack: err.stack });
         }
     });
 
@@ -267,7 +265,6 @@ io.on('connection', (socket) => {
     //           yang sama agar konsisten dengan pindah-tab.
     // T5.1 — Simpan device_type di log_kecurangan
     socket.on('copy-paste', async () => {
-        console.log('copy-paste dari socket:', socket.id);
         const data = sessionSocketMap.get(socket.id);
         if (!data) return;
         const { siswa_id, ujian_id, device_type } = data;
@@ -283,7 +280,7 @@ io.on('connection', (socket) => {
             await cekDanPaksaSubmit(pool, socket, siswa_id, ujian_id, 'copy_paste');
             await monitorService.siarkanUpdateSiswa(io, ujian_id, siswa_id, pool, { event: 'pelanggaran' });
         } catch (err) {
-            console.error('copy-paste error:', err);
+            logger.error(`copy-paste error: ${err.message}`, { stack: err.stack });
         }
     });
 
@@ -293,7 +290,6 @@ io.on('connection', (socket) => {
     // sama seperti pindah_tab dan copy_paste.
     // T5.1 & T5.2 — Hanya dihitung untuk Laptop; HP tidak mewajibkan fullscreen
     socket.on('keluar-fullscreen', async () => {
-        console.log('keluar-fullscreen dari socket:', socket.id);
         const data = sessionSocketMap.get(socket.id);
         if (!data) return;
         const { siswa_id, ujian_id, device_type } = data;
@@ -301,7 +297,6 @@ io.on('connection', (socket) => {
 
         // Jika HP: abaikan event keluar-fullscreen palsu
         if (device_type === 'hp') {
-            console.log('keluar-fullscreen diabaikan untuk perangkat hp:', socket.id);
             return;
         }
 
@@ -315,14 +310,13 @@ io.on('connection', (socket) => {
             await cekDanPaksaSubmit(pool, socket, siswa_id, ujian_id, 'keluar_fullscreen');
             await monitorService.siarkanUpdateSiswa(io, ujian_id, siswa_id, pool, { event: 'pelanggaran' });
         } catch (err) {
-            console.error('keluar-fullscreen error:', err);
+            logger.error(`keluar-fullscreen error: ${err.message}`, { stack: err.stack });
         }
     });
 
     // ── selesai-ujian ──
     // FIX #12 — Update status sesi_ujian ke 'selesai'
     socket.on('selesai-ujian', async () => {
-        console.log('selesai-ujian dari socket:', socket.id);
         const data = sessionSocketMap.get(socket.id);
         if (data) {
             const { siswa_id, ujian_id } = data;
@@ -336,7 +330,7 @@ io.on('connection', (socket) => {
                 );
                 await monitorService.siarkanUpdateSiswa(io, ujian_id, siswa_id, pool, { event: 'selesai' });
             } catch (err) {
-                console.error('selesai-ujian update sesi error:', err);
+                logger.error(`selesai-ujian update sesi error: ${err.message}`, { stack: err.stack });
             }
         }
         sessionSocketMap.delete(socket.id);
@@ -345,7 +339,6 @@ io.on('connection', (socket) => {
 
     // ── disconnect ──
     socket.on('disconnect', async () => {
-        console.log('Socket disconnected:', socket.id);
         const data = sessionSocketMap.get(socket.id);
         if (data && data.siswa_id && data.ujian_id) {
             try {
@@ -356,7 +349,7 @@ io.on('connection', (socket) => {
                 );
                 await monitorService.siarkanUpdateSiswa(io, data.ujian_id, data.siswa_id, pool, { event: 'disconnect' });
             } catch (err) {
-                console.error('disconnect last_seen update error:', err);
+                logger.error(`disconnect last_seen update error: ${err.message}`, { stack: err.stack });
             }
         }
         sessionSocketMap.delete(socket.id);
@@ -413,7 +406,7 @@ app.get('/api/cek-status-ujian', async (req, res) => {
         });
 
     } catch (err) {
-        console.error('cek-status-ujian error:', err);
+        logger.error(`cek-status-ujian error: ${err.message}`, { stack: err.stack });
         res.status(500).json({ valid: false, reason: 'server_error' });
     }
 });
@@ -429,7 +422,7 @@ app.use((req, res, next) => {
 });
 
 app.use((err, req, res, next) => {
-    console.error('Server Error:', err);
+    logger.error(`Server Error: ${err.message}`, { stack: err.stack });
     const isDevelopment = process.env.NODE_ENV === 'development';
     res.status(err.status || 500).render('error', {
         message: err.message || 'Terjadi kesalahan server. Silakan coba lagi nanti.',
@@ -446,6 +439,6 @@ startAutoFinalizeJob(pool, 30000);
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`Server berjalan di http://localhost:${PORT}`);
-    console.log(`Akses dari HP: http://<IP_komputer>:${PORT}`);
+    logger.info(`Server berjalan di http://localhost:${PORT}`);
+    logger.info(`Akses dari HP: http://<IP_komputer>:${PORT}`);
 });
