@@ -25,10 +25,30 @@ router.get('/dashboard', async (req, res) => {
         JOIN kelas k ON pg.kelas_id = k.id JOIN mata_pelajaran p ON pg.mapel_id = p.id
         ORDER BY u.created_at DESC LIMIT 5
     `);
+
+    // Tren rata-rata nilai 10 ujian terakhir (diurutkan kronologis agar grafik terbaca kiri->kanan sebagai waktu)
+    const [trenNilaiRaw] = await pool.query(`
+        SELECT u.nama_ujian, u.tanggal_mulai, AVG(n.nilai) as rata_rata
+        FROM nilai_ujian n JOIN ujian u ON n.ujian_id = u.id
+        GROUP BY u.id, u.nama_ujian, u.tanggal_mulai
+        ORDER BY u.tanggal_mulai DESC
+        LIMIT 10
+    `);
+    const trenNilai = trenNilaiRaw.reverse();
+
+    // Rata-rata nilai per kelas (seluruh ujian)
+    const [rataPerKelas] = await pool.query(`
+        SELECT s.kelas, AVG(n.nilai) as rata_rata, COUNT(*) as jumlah
+        FROM nilai_ujian n JOIN siswa s ON n.siswa_id = s.id
+        GROUP BY s.kelas
+        ORDER BY s.kelas
+    `);
+
     res.render('admin/dashboard', {
         totalGuru: totalGuru[0].total, totalSiswa: totalSiswa[0].total,
         totalUjian: totalUjian[0].total, totalSoal: totalSoal[0].total,
-        ujianAktif: ujianAktif[0].total, siswaPerKelas, ujianTerbaru
+        ujianAktif: ujianAktif[0].total, siswaPerKelas, ujianTerbaru,
+        trenNilai, rataPerKelas
     });
 });
 

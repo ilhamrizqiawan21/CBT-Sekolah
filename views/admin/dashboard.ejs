@@ -65,6 +65,34 @@
         </div>
     </div>
 
+    <!-- Grafik Analitik -->
+    <div class="row">
+        <div class="col-lg-7 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-header bg-primary text-white">Tren Rata-Rata Nilai (10 Ujian Terakhir)</div>
+                <div class="card-body">
+                    <% if (trenNilai.length === 0) { %>
+                        <p class="text-muted text-center mb-0">Belum ada data nilai untuk ditampilkan</p>
+                    <% } else { %>
+                        <canvas id="chartTrenNilai" height="110"></canvas>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-5 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-header bg-success text-white">Rata-Rata Nilai per Kelas</div>
+                <div class="card-body">
+                    <% if (rataPerKelas.length === 0) { %>
+                        <p class="text-muted text-center mb-0">Belum ada data nilai untuk ditampilkan</p>
+                    <% } else { %>
+                        <canvas id="chartRataKelas" height="110"></canvas>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Ujian Aktif & Siswa Per Kelas -->
     <div class="row">
         <div class="col-lg-6 mb-4">
@@ -129,5 +157,53 @@
         </div>
     </div>
 </div>
+
+<script src="/vendor/chart.js/chart.umd.min.js"></script>
+<script>
+    (function() {
+        // JSON.stringify tidak meng-escape "</script>"; data nama ujian/kelas bisa
+        // diisi admin bebas, jadi harus dijaga agar tidak memutus tag <script> ini.
+        const trenNilai = <%- JSON.stringify(trenNilai).replace(/</g, '\\u003c') %>;
+        if (trenNilai.length > 0) {
+            new Chart(document.getElementById('chartTrenNilai'), {
+                type: 'line',
+                data: {
+                    labels: trenNilai.map(t => t.nama_ujian),
+                    datasets: [{
+                        label: 'Rata-rata Nilai',
+                        data: trenNilai.map(t => Math.round(t.rata_rata * 10) / 10),
+                        borderColor: '#4e73df',
+                        backgroundColor: 'rgba(78, 115, 223, 0.1)',
+                        tension: 0.3,
+                        fill: true
+                    }]
+                },
+                options: {
+                    scales: { y: { beginAtZero: true, max: 100 } },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        const rataPerKelas = <%- JSON.stringify(rataPerKelas).replace(/</g, '\\u003c') %>;
+        if (rataPerKelas.length > 0) {
+            new Chart(document.getElementById('chartRataKelas'), {
+                type: 'bar',
+                data: {
+                    labels: rataPerKelas.map(k => k.kelas || 'Tidak ada kelas'),
+                    datasets: [{
+                        label: 'Rata-rata Nilai',
+                        data: rataPerKelas.map(k => Math.round(k.rata_rata * 10) / 10),
+                        backgroundColor: '#1cc88a'
+                    }]
+                },
+                options: {
+                    scales: { y: { beginAtZero: true, max: 100 } },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+    })();
+</script>
 
 <%- include('../partials/footer') %>
