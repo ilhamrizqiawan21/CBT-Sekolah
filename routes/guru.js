@@ -116,11 +116,11 @@ router.get('/kelola-soal', async (req, res) => {
     const filterUjian = req.query.ujian || '';
 
     const [ujianList] = await pool.query(`
-        SELECT DISTINCT u.id, u.nama_ujian, mp.nama_mapel, k.nama_kelas
-        FROM ujian u 
-        JOIN pengajaran pg ON u.pengajaran_id = pg.id 
-        JOIN mata_pelajaran mp ON pg.mapel_id = mp.id 
-        JOIN kelas k ON pg.kelas_id = k.id 
+        SELECT DISTINCT u.id, u.nama_ujian, u.tanggal_mulai, mp.nama_mapel, k.nama_kelas
+        FROM ujian u
+        JOIN pengajaran pg ON u.pengajaran_id = pg.id
+        JOIN mata_pelajaran mp ON pg.mapel_id = mp.id
+        JOIN kelas k ON pg.kelas_id = k.id
         WHERE pg.guru_id = ?
         ORDER BY u.tanggal_mulai DESC
     `, [guruId]);
@@ -315,8 +315,8 @@ router.post('/soal/edit/:id', async (req, res) => {
         }
         res.redirect('/guru/kelola-soal?msg=Soal berhasil diupdate');
     } catch (err) {
-        console.error(err);
-        res.redirect(`/guru/kelola-soal?error=Gagal update soal`);
+        logger.error(`Update soal gagal: ${err.message}`);
+        res.redirect('/guru/kelola-soal?error=Gagal update soal');
     }
 });
 
@@ -335,7 +335,7 @@ router.post('/soal/hapus/:id', async (req, res) => {
         await pool.query('DELETE FROM soal WHERE id = ?', [req.params.id]);
         res.redirect('/guru/kelola-soal?msg=Soal berhasil dihapus');
     } catch (err) {
-        console.error(err);
+        logger.error(`Hapus soal gagal: ${err.message}`);
         res.redirect('/guru/kelola-soal?error=Gagal hapus soal');
     }
 });
@@ -365,11 +365,11 @@ router.get('/hasil-siswa', async (req, res) => {
 
     // Ambil daftar ujian yang diajar oleh guru ini (untuk dropdown filter)
     const [ujianList] = await pool.query(`
-        SELECT DISTINCT u.id, u.nama_ujian, mp.nama_mapel, k.nama_kelas
-        FROM ujian u 
-        JOIN pengajaran pg ON u.pengajaran_id = pg.id 
-        JOIN mata_pelajaran mp ON pg.mapel_id = mp.id 
-        JOIN kelas k ON pg.kelas_id = k.id 
+        SELECT DISTINCT u.id, u.nama_ujian, u.tanggal_mulai, mp.nama_mapel, k.nama_kelas
+        FROM ujian u
+        JOIN pengajaran pg ON u.pengajaran_id = pg.id
+        JOIN mata_pelajaran mp ON pg.mapel_id = mp.id
+        JOIN kelas k ON pg.kelas_id = k.id
         WHERE pg.guru_id = ?
         ORDER BY u.tanggal_mulai DESC
     `, [guruId]);
@@ -543,11 +543,11 @@ router.get('/log-kecurangan', async (req, res) => {
 
     // Ambil daftar ujian yang diajar oleh guru ini (untuk dropdown filter)
     const [ujianList] = await pool.query(`
-        SELECT DISTINCT u.id, u.nama_ujian, mp.nama_mapel, k.nama_kelas
-        FROM ujian u 
-        JOIN pengajaran pg ON u.pengajaran_id = pg.id 
-        JOIN mata_pelajaran mp ON pg.mapel_id = mp.id 
-        JOIN kelas k ON pg.kelas_id = k.id 
+        SELECT DISTINCT u.id, u.nama_ujian, u.tanggal_mulai, mp.nama_mapel, k.nama_kelas
+        FROM ujian u
+        JOIN pengajaran pg ON u.pengajaran_id = pg.id
+        JOIN mata_pelajaran mp ON pg.mapel_id = mp.id
+        JOIN kelas k ON pg.kelas_id = k.id
         WHERE pg.guru_id = ?
         ORDER BY u.tanggal_mulai DESC
     `, [guruId]);
@@ -774,7 +774,7 @@ router.get('/essay', async (req, res) => {
             error: req.query.error
         });
     } catch (err) {
-        console.error('Error GET /guru/essay:', err);
+        logger.error(`Error GET /guru/essay: ${err.message}`);
         res.status(500).send('Terjadi kesalahan saat memuat daftar penilaian essay');
     }
 });
@@ -840,7 +840,7 @@ router.get('/essay/:ujianId', async (req, res) => {
             error: req.query.error
         });
     } catch (err) {
-        console.error('Error GET /guru/essay/:ujianId:', err);
+        logger.error(`Error GET /guru/essay/:ujianId: ${err.message}`);
         res.status(500).send('Terjadi kesalahan saat memuat form penilaian essay');
     }
 });
@@ -943,7 +943,7 @@ router.post('/essay/:ujianId', async (req, res) => {
 
         res.redirect(`/guru/essay/${ujianId}?msg=` + encodeURIComponent('Nilai essay berhasil disimpan dan nilai akhir telah dihitung ulang'));
     } catch (err) {
-        console.error('Error POST /guru/essay/:ujianId:', err);
+        logger.error(`Error POST /guru/essay/:ujianId: ${err.message}`);
         res.status(500).send('Terjadi kesalahan saat menyimpan nilai essay: ' + err.message);
     }
 });
@@ -1032,7 +1032,7 @@ router.get('/essay/:ujianId/export', async (req, res) => {
         await workbook.xlsx.write(res);
         res.end();
     } catch (err) {
-        console.error('Error GET /guru/essay/:ujianId/export:', err);
+        logger.error(`Error GET /guru/essay/:ujianId/export: ${err.message}`);
         res.status(500).send('Terjadi kesalahan saat mengekspor Excel');
     }
 });
@@ -1183,7 +1183,7 @@ router.post('/essay/:ujianId/import', uploadEssay.single('file_excel'), async (r
         res.redirect(`/guru/essay/${ujianId}?msg=` + encodeURIComponent(`Berhasil mengimpor nilai essay untuk ${affectedSiswaIds.size} siswa`));
     } catch (err) {
         cleanup();
-        console.error('Error POST /guru/essay/:ujianId/import:', err);
+        logger.error(`Error POST /guru/essay/:ujianId/import: ${err.message}`);
         res.status(500).send('Terjadi kesalahan saat mengimpor nilai essay: ' + err.message);
     }
 });

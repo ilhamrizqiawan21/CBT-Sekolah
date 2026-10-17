@@ -29,11 +29,11 @@
     </div>
 
     <!-- Notifikasi -->
-    <% if (query && query.msg) { %>
-        <div class="alert alert-success alert-dismissible fade show"><i class="bi bi-check-circle"></i> <%= query.msg %><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+    <% if (msg) { %>
+        <div class="alert alert-success alert-dismissible fade show"><i class="bi bi-check-circle"></i> <%= msg %><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
     <% } %>
-    <% if (query && query.error) { %>
-        <div class="alert alert-danger alert-dismissible fade show"><i class="bi bi-exclamation-triangle"></i> <%= query.error %><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+    <% if (error) { %>
+        <div class="alert alert-danger alert-dismissible fade show"><i class="bi bi-exclamation-triangle"></i> <%= error %><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
     <% } %>
 
     <!-- Tabel Data Pengajaran -->

@@ -47,11 +47,11 @@ router.post('/guru/tambah', async (req, res) => {
     try {
         await pool.query('INSERT INTO guru (nip, nama, username, password) VALUES (?, ?, ?, ?)', [nip, nama, username, hashed]);
         res.redirect('/admin/guru?msg=Guru berhasil ditambahkan');
-    } catch (err) { console.error(err); res.redirect('/admin/guru?error=Gagal menambahkan guru'); }
+    } catch (err) { logger.error(err.message); res.redirect('/admin/guru?error=Gagal menambahkan guru'); }
 });
 router.post('/guru/hapus/:id', async (req, res) => {
     try { await pool.query('DELETE FROM guru WHERE id = ?', [req.params.id]); res.redirect('/admin/guru?msg=Guru berhasil dihapus'); }
-    catch (err) { console.error(err); res.redirect('/admin/guru?error=Gagal hapus guru'); }
+    catch (err) { logger.error(err.message); res.redirect('/admin/guru?error=Gagal hapus guru'); }
 });
 router.post('/guru/edit/:id', async (req, res) => {
     const { id } = req.params;
@@ -64,7 +64,7 @@ router.post('/guru/edit/:id', async (req, res) => {
             await pool.query('UPDATE guru SET nip=?, nama=?, username=? WHERE id=?', [nip, nama, username, id]);
         }
         res.redirect('/admin/guru?msg=Guru berhasil diupdate');
-    } catch (err) { console.error(err); res.redirect('/admin/guru?error=Gagal update guru'); }
+    } catch (err) { logger.error(err.message); res.redirect('/admin/guru?error=Gagal update guru'); }
 });
 
 // ============================================================
@@ -80,7 +80,7 @@ router.post('/kelas/tambah', async (req, res) => {
     try {
         await pool.query('INSERT INTO kelas (nama_kelas) VALUES (?)', [nama]);
         res.redirect('/admin/kelas?msg=Kelas berhasil ditambahkan');
-    } catch (err) { console.error(err); res.redirect('/admin/kelas?error=Gagal menambahkan kelas (nama mungkin sudah ada)'); }
+    } catch (err) { logger.error(err.message); res.redirect('/admin/kelas?error=Gagal menambahkan kelas (nama mungkin sudah ada)'); }
 });
 router.post('/kelas/hapus/:id', async (req, res) => {
     try {
@@ -94,7 +94,7 @@ router.post('/kelas/hapus/:id', async (req, res) => {
         }
         await pool.query('DELETE FROM kelas WHERE id = ?', [req.params.id]);
         res.redirect('/admin/kelas?msg=Kelas berhasil dihapus');
-    } catch (err) { console.error(err); res.redirect('/admin/kelas?error=Gagal menghapus kelas'); }
+    } catch (err) { logger.error(err.message); res.redirect('/admin/kelas?error=Gagal menghapus kelas'); }
 });
 router.post('/kelas/edit/:id', async (req, res) => {
     const namaBaru = (req.body.nama_kelas || '').trim();
@@ -114,7 +114,7 @@ router.post('/kelas/edit/:id', async (req, res) => {
         res.redirect('/admin/kelas?msg=Kelas berhasil diperbarui');
     } catch (err) {
         await conn.rollback();
-        console.error(err);
+        logger.error(err.message);
         res.redirect('/admin/kelas?error=Gagal memperbarui kelas (nama mungkin sudah dipakai)');
     } finally { conn.release(); }
 });
@@ -138,7 +138,7 @@ router.post('/mapel/edit/:id', async (req, res) => {
     try {
         await pool.query('UPDATE mata_pelajaran SET nama_mapel = ? WHERE id = ?', [req.body.nama_mapel, req.params.id]);
         res.redirect('/admin/mapel?msg=Mapel berhasil diperbarui');
-    } catch (err) { console.error(err); res.redirect('/admin/mapel?error=Gagal memperbarui mapel'); }
+    } catch (err) { logger.error(err.message); res.redirect('/admin/mapel?error=Gagal memperbarui mapel'); }
 });
 
 // ============================================================
@@ -180,7 +180,7 @@ router.post('/ujian/tambah', async (req, res) => {
     try {
         await pool.query(`INSERT INTO ujian (pengajaran_id, nama_ujian, durasi, tanggal_mulai, tanggal_selesai, acak_soal, acak_pilihan, batas_pelanggaran, token_ujian) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, [pengajaran_id, nama_ujian, durasi, tanggal_mulai, tanggal_selesai, acak_soal || 0, acak_pilihan || 0, batas, token]);
         res.redirect('/admin/ujian?msg=Ujian berhasil ditambahkan');
-    } catch (err) { console.error(err); res.redirect('/admin/ujian?error=Gagal menambahkan ujian'); }
+    } catch (err) { logger.error(err.message); res.redirect('/admin/ujian?error=Gagal menambahkan ujian'); }
 });
 router.get('/ujian/edit/:id', async (req, res) => {
     const [ujian] = await pool.query('SELECT * FROM ujian WHERE id = ?', [req.params.id]);
@@ -198,11 +198,11 @@ router.post('/ujian/edit/:id', async (req, res) => {
     try {
         await pool.query(`UPDATE ujian SET pengajaran_id=?, nama_ujian=?, durasi=?, tanggal_mulai=?, tanggal_selesai=?, acak_soal=?, acak_pilihan=?, batas_pelanggaran=?, token_ujian=? WHERE id=?`, [pengajaran_id, nama_ujian, durasi, tanggal_mulai, tanggal_selesai, acak_soal || 0, acak_pilihan || 0, batas, token, req.params.id]);
         res.redirect('/admin/ujian?msg=Ujian berhasil diupdate');
-    } catch (err) { console.error(err); res.redirect(`/admin/ujian/edit/${req.params.id}?error=Gagal update ujian`); }
+    } catch (err) { logger.error(err.message); res.redirect(`/admin/ujian/edit/${req.params.id}?error=Gagal update ujian`); }
 });
 router.post('/ujian/hapus/:id', async (req, res) => {
     try { await pool.query('DELETE FROM ujian WHERE id = ?', [req.params.id]); res.redirect('/admin/ujian?msg=Ujian berhasil dihapus'); }
-    catch (err) { console.error(err); res.redirect('/admin/ujian?error=Gagal menghapus ujian (masih terhubung dengan data lain)'); }
+    catch (err) { logger.error(err.message); res.redirect('/admin/ujian?error=Gagal menghapus ujian (masih terhubung dengan data lain)'); }
 });
 router.get('/api/ujian-by-mapel/:mapelId', async (req, res) => {
     const mapelId = req.params.mapelId;
@@ -235,7 +235,7 @@ router.post('/soal/tambah', async (req, res) => {
             await pool.query(`INSERT INTO soal (ujian_id, tipe_soal, teks_soal, poin, jawaban_benar, opsi_tambahan) VALUES (?, ?, ?, ?, ?, ?)`, [ujian_id, tipe_soal, teks_soal, poinDefault(tipe_soal, poin), jawaban_benar, opsi_tambahan]);
         }
         res.redirect('/admin/soal?msg=Soal berhasil ditambahkan');
-    } catch (err) { console.error(err); res.redirect('/admin/soal?error=Gagal menambahkan soal'); }
+    } catch (err) { logger.error(err.message); res.redirect('/admin/soal?error=Gagal menambahkan soal'); }
 });
 router.get('/soal/edit/:id', async (req, res) => {
     const [soal] = await pool.query('SELECT * FROM soal WHERE id = ?', [req.params.id]);
@@ -252,11 +252,11 @@ router.post('/soal/edit/:id', async (req, res) => {
             await pool.query(`UPDATE soal SET ujian_id=?, tipe_soal=?, teks_soal=?, poin=?, jawaban_benar=?, opsi_tambahan=? WHERE id=?`, [ujian_id, tipe_soal, teks_soal, poinDefault(tipe_soal, poin), jawaban_benar, opsi_tambahan, req.params.id]);
         }
         res.redirect('/admin/soal?msg=Soal berhasil diupdate');
-    } catch (err) { console.error(err); res.redirect(`/admin/soal/edit/${req.params.id}?error=Gagal update soal`); }
+    } catch (err) { logger.error(err.message); res.redirect(`/admin/soal/edit/${req.params.id}?error=Gagal update soal`); }
 });
 router.post('/soal/hapus/:id', async (req, res) => {
     try { await pool.query('DELETE FROM soal WHERE id = ?', [req.params.id]); res.redirect('/admin/soal?msg=Soal berhasil dihapus'); }
-    catch (err) { console.error(err); res.redirect('/admin/soal?error=Gagal hapus soal'); }
+    catch (err) { logger.error(err.message); res.redirect('/admin/soal?error=Gagal hapus soal'); }
 });
 router.get('/soal/tambah-batch', async (req, res) => {
     const [mapelList] = await pool.query('SELECT id, nama_mapel FROM mata_pelajaran ORDER BY nama_mapel');
@@ -281,7 +281,7 @@ router.post('/soal/batch-tambah', async (req, res) => {
             totalInserted++;
         }
         res.json({ success: true, total: totalInserted });
-    } catch (err) { console.error(err); res.status(500).json({ success: false, error: err.message }); }
+    } catch (err) { logger.error(err.message); res.status(500).json({ success: false, error: err.message }); }
 });
 
 // ============================================================
@@ -289,20 +289,20 @@ router.post('/soal/batch-tambah', async (req, res) => {
 // ============================================================
 router.get('/pengajaran', async (req, res) => {
     const [pengajaran] = await pool.query(`SELECT pg.id, g.nama as guru_nama, p.nama_mapel, k.nama_kelas FROM pengajaran pg JOIN guru g ON pg.guru_id = g.id JOIN mata_pelajaran p ON pg.mapel_id = p.id JOIN kelas k ON pg.kelas_id = k.id ORDER BY p.nama_mapel, k.nama_kelas`);
-    const [guruList]  = await pool.query('SELECT id, nama FROM guru ORDER BY nama');
-    const [mapelList] = await pool.query('SELECT id, nama_mapel FROM mata_pelajaran ORDER BY nama_mapel');
-    const [kelasList] = await pool.query('SELECT id, nama_kelas FROM kelas ORDER BY nama_kelas');
-    res.render('admin/pengajaran', { pengajaran, guruList, mapelList, kelasList, msg: req.query.msg, error: req.query.error });
+    const [guru]  = await pool.query('SELECT id, nama FROM guru ORDER BY nama');
+    const [mapel] = await pool.query('SELECT id, nama_mapel FROM mata_pelajaran ORDER BY nama_mapel');
+    const [kelas] = await pool.query('SELECT id, nama_kelas FROM kelas ORDER BY nama_kelas');
+    res.render('admin/pengajaran', { pengajaran, guru, mapel, kelas, msg: req.query.msg, error: req.query.error });
 });
 router.post('/pengajaran/tambah', async (req, res) => {
     try {
         await pool.query('INSERT INTO pengajaran (guru_id, mapel_id, kelas_id) VALUES (?, ?, ?)', [req.body.guru_id, req.body.mapel_id, req.body.kelas_id]);
         res.redirect('/admin/pengajaran?msg=Berhasil ditambahkan');
-    } catch (err) { console.error(err); res.redirect('/admin/pengajaran?error=Gagal menambahkan (mungkin sudah ada)'); }
+    } catch (err) { logger.error(err.message); res.redirect('/admin/pengajaran?error=Gagal menambahkan (mungkin sudah ada)'); }
 });
 router.post('/pengajaran/hapus/:id', async (req, res) => {
     try { await pool.query('DELETE FROM pengajaran WHERE id = ?', [req.params.id]); res.redirect('/admin/pengajaran?msg=Berhasil dihapus'); }
-    catch (err) { console.error(err); res.redirect('/admin/pengajaran?error=Gagal menghapus data'); }
+    catch (err) { logger.error(err.message); res.redirect('/admin/pengajaran?error=Gagal menghapus data'); }
 });
 
 // ============================================================
@@ -366,12 +366,12 @@ router.post('/siswa/tambah', async (req, res) => {
         const hashed = await bcrypt.hash(pin, 10);
         await pool.query('INSERT INTO siswa (nis, nama, kelas, pin_ujian) VALUES (?, ?, ?, ?)', [nis, nama, kelas || null, hashed]);
         res.redirect('/admin/siswa?msg=Siswa berhasil ditambahkan');
-    } catch (err) { console.error(err); res.redirect('/admin/siswa?error=Gagal menambahkan siswa (NIS mungkin sudah ada)'); }
+    } catch (err) { logger.error(err.message); res.redirect('/admin/siswa?error=Gagal menambahkan siswa (NIS mungkin sudah ada)'); }
 });
 
 router.post('/siswa/hapus/:id', async (req, res) => {
     try { await pool.query('DELETE FROM siswa WHERE id = ?', [req.params.id]); res.redirect('/admin/siswa?msg=Siswa berhasil dihapus'); }
-    catch (err) { console.error(err); res.redirect('/admin/siswa?error=Gagal hapus siswa, mungkin masih terhubung dengan data ujian'); }
+    catch (err) { logger.error(err.message); res.redirect('/admin/siswa?error=Gagal hapus siswa, mungkin masih terhubung dengan data ujian'); }
 });
 
 router.get('/siswa/template', async (req, res) => {
@@ -464,7 +464,7 @@ router.post('/siswa/import', uploadMiddleware, async (req, res) => {
 router.get('/siswa/edit/:id', async (req, res) => {
     const [siswa] = await pool.query('SELECT * FROM siswa WHERE id = ?', [req.params.id]);
     if (siswa.length === 0) return res.redirect('/admin/siswa?error=Siswa tidak ditemukan');
-    res.render('admin/siswa_edit', { siswa: siswa[0] });
+    res.render('admin/siswa_edit', { siswa: siswa[0], error: req.query.error });
 });
 
 // Edit siswa — FIX #7: hash PIN baru jika diisi, skip jika kosong
@@ -482,7 +482,7 @@ router.post('/siswa/edit/:id', async (req, res) => {
             await pool.query('UPDATE siswa SET nis=?, nama=?, kelas=? WHERE id=?', [nis, nama, kelas, req.params.id]);
         }
         res.redirect('/admin/siswa?msg=Siswa berhasil diupdate');
-    } catch (err) { console.error(err); res.redirect(`/admin/siswa/edit/${req.params.id}?error=Gagal update`); }
+    } catch (err) { logger.error(err.message); res.redirect(`/admin/siswa/edit/${req.params.id}?error=Gagal update`); }
 });
 
 // ============================================================
@@ -505,14 +505,97 @@ router.get('/hasil', async (req, res) => {
 });
 
 router.get('/log-kecurangan', async (req, res) => {
-    const filterUjian = req.query.ujian || '', filterJenis = req.query.jenis || '';
+    const page = parseInt(req.query.page) || 1;
+    const limit = 10;
+    const offset = (page - 1) * limit;
+    const filterUjian = req.query.ujian || '';
+    const filterSiswa = req.query.siswa || '';
+    const filterJenis = req.query.jenis || '';
+
     const [ujianList] = await pool.query('SELECT id, nama_ujian FROM ujian ORDER BY nama_ujian');
+    const [siswaList] = await pool.query(`
+        SELECT DISTINCT s.id, s.nis, s.nama
+        FROM log_kecurangan lk
+        JOIN siswa s ON lk.siswa_id = s.id
+        ORDER BY s.nama
+    `);
+
     let baseQuery = `FROM log_kecurangan lk JOIN siswa s ON lk.siswa_id = s.id JOIN ujian u ON lk.ujian_id = u.id WHERE 1=1`;
     let params = [];
     if (filterUjian) { baseQuery += ' AND lk.ujian_id = ?'; params.push(filterUjian); }
+    if (filterSiswa) { baseQuery += ' AND lk.siswa_id = ?'; params.push(filterSiswa); }
     if (filterJenis) { baseQuery += ' AND lk.jenis_kecurangan = ?'; params.push(filterJenis); }
-    const [log] = await pool.query(`SELECT lk.*, s.nama as siswa_nama, s.nis, u.nama_ujian ${baseQuery} ORDER BY lk.timestamp DESC`, params);
-    res.render('admin/log_kecurangan', { log, ujianList, filterUjian, filterJenis, msg: req.query.msg, error: req.query.error });
+
+    const [totalResult] = await pool.query(`SELECT COUNT(*) as total ${baseQuery}`, params);
+    const total = totalResult[0].total;
+    const totalPages = Math.ceil(total / limit);
+
+    const [logs] = await pool.query(`
+        SELECT lk.*, s.nama as siswa_nama, s.nis, u.nama_ujian ${baseQuery}
+        ORDER BY lk.timestamp DESC
+        LIMIT ? OFFSET ?
+    `, [...params, limit, offset]);
+
+    const [statistik] = await pool.query(`
+        SELECT lk.jenis_kecurangan, COUNT(*) as jumlah
+        FROM log_kecurangan lk
+        GROUP BY lk.jenis_kecurangan
+    `);
+
+    res.render('admin/log_kecurangan', {
+        logs, ujianList, siswaList, statistik, total,
+        filterUjian, filterSiswa, filterJenis,
+        currentPage: page, totalPages,
+        msg: req.query.msg, error: req.query.error
+    });
+});
+
+router.get('/log-kecurangan/export', async (req, res) => {
+    const filterUjian = req.query.ujian || '';
+    const filterSiswa = req.query.siswa || '';
+    const filterJenis = req.query.jenis || '';
+
+    let query = `
+        SELECT lk.timestamp, s.nis, s.nama as siswa_nama, u.nama_ujian, lk.jenis_kecurangan
+        FROM log_kecurangan lk
+        JOIN siswa s ON lk.siswa_id = s.id
+        JOIN ujian u ON lk.ujian_id = u.id
+        WHERE 1=1
+    `;
+    let params = [];
+    if (filterUjian) { query += ' AND lk.ujian_id = ?'; params.push(filterUjian); }
+    if (filterSiswa) { query += ' AND lk.siswa_id = ?'; params.push(filterSiswa); }
+    if (filterJenis) { query += ' AND lk.jenis_kecurangan = ?'; params.push(filterJenis); }
+    query += ' ORDER BY lk.timestamp DESC';
+
+    const [logs] = await pool.query(query, params);
+
+    const ExcelJS = require('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Log Kecurangan');
+    worksheet.columns = [
+        { header: 'Waktu', key: 'timestamp', width: 20 },
+        { header: 'NIS', key: 'nis', width: 15 },
+        { header: 'Siswa', key: 'siswa_nama', width: 30 },
+        { header: 'Ujian', key: 'nama_ujian', width: 30 },
+        { header: 'Jenis Kecurangan', key: 'jenis_kecurangan', width: 20 }
+    ];
+    logs.forEach(log => {
+        worksheet.addRow({
+            timestamp: new Date(log.timestamp).toLocaleString(),
+            nis: log.nis,
+            siswa_nama: log.siswa_nama,
+            nama_ujian: log.nama_ujian,
+            jenis_kecurangan: log.jenis_kecurangan.replace('_', ' ')
+        });
+    });
+    worksheet.getRow(1).font = { bold: true };
+    worksheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDC3545' } };
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=log_kecurangan_admin.xlsx');
+    await workbook.xlsx.write(res);
+    res.end();
 });
 
 // ─────────────────────────────────────────────
@@ -871,7 +954,7 @@ router.post('/reset-ujian', async (req, res) => {
         await resetDenganTransaksi(parseInt(ujian_id, 10), parseInt(siswa_id, 10));
         logger.info(`Admin ${req.session.adminId} reset ujian ${ujian_id} untuk siswa ${siswa_id}`);
         res.redirect('/admin/hasil?msg=Reset berhasil untuk siswa tersebut');
-    } catch (err) { console.error(err); res.redirect('/admin/hasil?error=Gagal reset ujian'); }
+    } catch (err) { logger.error(err.message); res.redirect('/admin/hasil?error=Gagal reset ujian'); }
 });
 
 router.post('/reset-ujian-semua', async (req, res) => {
@@ -881,7 +964,7 @@ router.post('/reset-ujian-semua', async (req, res) => {
         await resetDenganTransaksi(parseInt(ujian_id, 10), null);
         logger.info(`Admin ${req.session.adminId} reset SEMUA data ujian ${ujian_id}`);
         res.redirect('/admin/hasil?msg=Semua data ujian berhasil direset');
-    } catch (err) { console.error(err); res.redirect('/admin/hasil?error=Gagal reset semua'); }
+    } catch (err) { logger.error(err.message); res.redirect('/admin/hasil?error=Gagal reset semua'); }
 });
 
 router.get('/hasil/export', async (req, res) => {
@@ -916,7 +999,7 @@ router.get('/hasil/cetak/:ujianId', async (req, res) => {
             if (row.soal_id) siswaMap.get(row.nis).jawaban.push({ soal_id: row.soal_id, teks_soal: row.teks_soal, tipe: row.tipe_soal, jawaban_benar: row.jawaban_benar, jawaban_siswa: row.jawaban_dipilih, is_benar: row.is_benar });
         });
         res.render('admin/cetak_hasil', { ujian: ujian[0], siswaList: Array.from(siswaMap.values()) });
-    } catch (err) { console.error(err); res.status(500).send('Terjadi kesalahan'); }
+    } catch (err) { logger.error(err.message); res.status(500).send('Terjadi kesalahan'); }
 });
 
 module.exports = router;
