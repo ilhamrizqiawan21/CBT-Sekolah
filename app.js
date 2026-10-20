@@ -77,6 +77,26 @@ app.use(verifySameOrigin);
 io.engine.use(sessionMiddleware);
 app.set('io', io);
 
+// ─── Pengaturan Identitas & Logo Sekolah ───
+const pengaturanService = require('./services/pengaturanService');
+app.use(async (req, res, next) => {
+    try {
+        const settings = await pengaturanService.getPengaturan(pool);
+        res.locals.appSettings = settings;
+        res.locals.namaSekolah = settings.nama_sekolah || 'CBT Sekolah';
+        res.locals.logoSekolah = (settings.logo_sekolah && settings.logo_sekolah.trim() !== '')
+            ? settings.logo_sekolah
+            : '/images/default-logo.svg';
+        res.locals.isCustomLogo = Boolean(settings.logo_sekolah && settings.logo_sekolah.trim() !== '');
+    } catch (_) {
+        res.locals.appSettings = { nama_sekolah: 'CBT Sekolah', logo_sekolah: '' };
+        res.locals.namaSekolah = 'CBT Sekolah';
+        res.locals.logoSekolah = '/images/default-logo.svg';
+        res.locals.isCustomLogo = false;
+    }
+    next();
+});
+
 app.set('views',       path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
 

@@ -101,9 +101,9 @@
 <body>
 <div class="login-wrapper">
     <div class="login-brand">
-        <img src="/images/logo-sekolah.png" alt="Logo" onerror="this.style.display='none'">
+        <img src="<%= typeof logoSekolah !== 'undefined' ? logoSekolah : '/images/default-logo.svg' %>" alt="Logo" onerror="this.src='/images/default-logo.svg'">
         <h1>CBT Admin</h1>
-        <h1>MTs. AL-IHSAN BATUJAJAR</h1>
+        <p class="text-white-50 mb-0 font-weight-bold"><%= typeof namaSekolah !== 'undefined' ? namaSekolah : 'CBT Sekolah' %></p>
         <p>Panel Administrasi Sistem</p>
     </div>
 

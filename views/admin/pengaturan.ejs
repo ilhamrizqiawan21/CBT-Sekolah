@@ -1,0 +1,96 @@
+<%- include('../partials/header', { title: 'Pengaturan Sekolah' }) %>
+<%- include('../partials/sidebar_admin') %>
+
+<div class="container-fluid">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800"><i class="bi bi-gear"></i> Pengaturan Sekolah</h1>
+    </div>
+
+    <!-- Notifikasi -->
+    <% if (typeof msg !== 'undefined' && msg) { %>
+        <div class="alert alert-success alert-dismissible fade show"><%= msg %><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+    <% } %>
+    <% if (typeof error !== 'undefined' && error) { %>
+        <div class="alert alert-danger alert-dismissible fade show"><%= error %><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+    <% } %>
+
+    <div class="row">
+        <!-- Kolom Form Pengaturan -->
+        <div class="col-lg-7">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Identitas & Logo Sekolah</h6>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="/admin/pengaturan" enctype="multipart/form-data">
+                        <!-- Nama Sekolah -->
+                        <div class="mb-4">
+                            <label for="nama_sekolah" class="form-label font-weight-bold">Nama Sekolah / Lembaga</label>
+                            <input type="text" class="form-control" id="nama_sekolah" name="nama_sekolah"
+                                   value="<%= settings.nama_sekolah || '' %>" placeholder="Contoh: SMP / MTs / SMA Negeri ..." required maxlength="150">
+                            <div class="form-text text-muted">
+                                Nama ini tampil pada judul aplikasi, halaman login siswa/guru/admin, dan lembar ujian.
+                            </div>
+                        </div>
+
+                        <!-- Upload Logo Sekolah -->
+                        <div class="mb-4">
+                            <label for="logo_sekolah" class="form-label font-weight-bold">Unggah Logo Sekolah</label>
+                            <input class="form-control" type="file" id="logo_sekolah" name="logo" accept=".png,.jpg,.jpeg,.svg,.webp">
+                            <div class="form-text text-muted">
+                                Format didukung: <strong>PNG, JPG, SVG, WebP</strong>. Maksimal <strong>2 MB</strong>.
+                                Disarankan gambar persegi (rasio 1:1) dengan latar belakang transparan.
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-lg"></i> Simpan Perubahan
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Kolom Preview Logo Saat Ini -->
+        <div class="col-lg-5">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Status Logo Saat Ini</h6>
+                </div>
+                <div class="card-body text-center py-4">
+                    <div class="p-3 bg-light rounded d-inline-block border mb-3" style="width:120px;height:120px;display:flex;align-items:center;justify-content:center;">
+                        <img src="<%= logoSekolah %>" alt="Preview Logo"
+                             style="max-width:100px;max-height:100px;object-fit:contain;">
+                    </div>
+
+                    <h5 class="font-weight-bold mb-1"><%= settings.nama_sekolah || 'CBT Sekolah' %></h5>
+
+                    <div class="mb-3">
+                        <% if (isCustomLogo) { %>
+                            <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Logo Kustom Aktif</span>
+                        <% } else { %>
+                            <span class="badge bg-secondary"><i class="bi bi-image me-1"></i>Logo Default (SVG)</span>
+                        <% } %>
+                    </div>
+
+                    <% if (isCustomLogo) { %>
+                        <form method="POST" action="/admin/pengaturan/reset-logo" onsubmit="return confirm('Kembalikan logo ke logo default bawaan (SVG)?')">
+                            <button type="submit" class="btn btn-outline-danger btn-sm">
+                                <i class="bi bi-arrow-counterclockwise"></i> Reset ke Logo Default (SVG)
+                            </button>
+                        </form>
+                    <% } else { %>
+                        <p class="text-muted small mb-0">
+                            Selagi belum mengganti logo sekolah, aplikasi otomatis menggunakan logo default bawaan (vektor SVG) di seluruh halaman.
+                        </p>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<%- include('../partials/footer') %>
+

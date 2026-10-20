@@ -181,9 +181,9 @@
 <div class="login-wrapper">
     <!-- Brand -->
     <div class="login-brand">
-        <img src="/images/logo-sekolah.png" alt="Logo Sekolah"
-             onerror="this.style.display='none'">
-        <h1>CBT MTs. AL-IHSAN BATUJAJAR</h1>
+        <img src="<%= typeof logoSekolah !== 'undefined' ? logoSekolah : '/images/default-logo.svg' %>" alt="Logo <%= typeof namaSekolah !== 'undefined' ? namaSekolah : 'CBT Sekolah' %>"
+             onerror="this.src='/images/default-logo.svg'">
+        <h1><%= typeof namaSekolah !== 'undefined' ? namaSekolah : 'CBT Sekolah' %></h1>
         <p>Computer Based Test — Portal Siswa</p>
     </div>
 

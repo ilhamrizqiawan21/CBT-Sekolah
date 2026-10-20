@@ -47,8 +47,8 @@
 <body>
     <main class="wrap">
         <div class="brand">
-            <img src="/images/favicon.png" alt="Logo sekolah">
-            <h1>Ujian CBT Sekolah</h1>
+            <img src="<%= typeof logoSekolah !== 'undefined' ? logoSekolah : '/images/default-logo.svg' %>" alt="Logo sekolah" onerror="this.src='/images/default-logo.svg'">
+            <h1><%= typeof namaSekolah !== 'undefined' ? namaSekolah : 'CBT Sekolah' %></h1>
             <p>Pilih halaman masuk Anda</p>
         </div>
 

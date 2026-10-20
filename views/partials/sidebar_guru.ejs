@@ -2,7 +2,7 @@
 <nav class="sidebar" id="sidebar">
     <!-- Brand -->
     <div class="sidebar-brand">
-        <img src="/images/logo-sekolah.png" alt="Logo" style="width:32px;height:32px;object-fit:contain;flex-shrink:0;">
+        <img src="<%= typeof logoSekolah !== 'undefined' ? logoSekolah : '/images/default-logo.svg' %>" alt="Logo" style="width:32px;height:32px;object-fit:contain;flex-shrink:0;" onerror="this.src='/images/default-logo.svg'">
         <span class="sidebar-brand-text">CBT Guru</span>
     </div>
 

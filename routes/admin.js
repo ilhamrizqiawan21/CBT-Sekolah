@@ -1271,4 +1271,112 @@ router.post('/akun/hapus/:id', async (req, res) => {
     }
 });
 
+// ============================================================
+// PENGATURAN SEKOLAH (Identitas & Logo)
+// ============================================================
+const pengaturanService = require('../services/pengaturanService');
+
+const logoStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const uploadDir = path.join(__dirname, '..', 'public', 'uploads');
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname).toLowerCase();
+        cb(null, `logo-sekolah-${Date.now()}${ext}`);
+    }
+});
+
+const uploadLogo = multer({
+    storage: logoStorage,
+    limits: { fileSize: 2 * 1024 * 1024 }, // 2 MB
+    fileFilter: (req, file, cb) => {
+        const allowedExts = ['.png', '.jpg', '.jpeg', '.svg', '.webp'];
+        const ext = path.extname(file.originalname).toLowerCase();
+        if (!allowedExts.includes(ext)) {
+            return cb(new Error('Format file tidak didukung. Gunakan PNG, JPG, JPEG, SVG, atau WebP'));
+        }
+        cb(null, true);
+    }
+});
+
+const uploadLogoMiddleware = (req, res, next) => {
+    uploadLogo.single('logo')(req, res, (err) => {
+        if (err) {
+            return res.redirect('/admin/pengaturan?error=' + encodeURIComponent(err.message));
+        }
+        next();
+    });
+};
+
+router.get('/pengaturan', async (req, res) => {
+    try {
+        const settings = await pengaturanService.getPengaturan(pool);
+        res.render('admin/pengaturan', {
+            settings,
+            msg: req.query.msg || null,
+            error: req.query.error || null
+        });
+    } catch (err) {
+        logger.error(`GET /admin/pengaturan error: ${err.message}`);
+        res.render('admin/pengaturan', {
+            settings: pengaturanService.DEFAULTS,
+            msg: null,
+            error: 'Gagal memuat pengaturan'
+        });
+    }
+});
+
+router.post('/pengaturan', uploadLogoMiddleware, async (req, res) => {
+    try {
+        const namaSekolah = (req.body.nama_sekolah || '').trim();
+        if (!namaSekolah) {
+            if (req.file && req.file.path) {
+                try { fs.unlinkSync(req.file.path); } catch (_) {}
+            }
+            return res.redirect('/admin/pengaturan?error=' + encodeURIComponent('Nama sekolah tidak boleh kosong'));
+        }
+
+        const dataToUpdate = {
+            nama_sekolah: namaSekolah
+        };
+
+        if (req.file) {
+            const current = await pengaturanService.getPengaturan(pool);
+            if (current.logo_sekolah && current.logo_sekolah.startsWith('/uploads/')) {
+                const oldPath = path.join(__dirname, '..', 'public', current.logo_sekolah.replace(/^\//, ''));
+                try {
+                    if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+                } catch (_) {}
+            }
+            dataToUpdate.logo_sekolah = `/uploads/${req.file.filename}`;
+        }
+
+        await pengaturanService.simpanPengaturan(dataToUpdate, pool);
+        await catatAktivitas(req.session.adminId, 'edit', 'pengaturan', null, `Memperbarui nama sekolah menjadi "${namaSekolah}"${req.file ? ' dan mengganti logo' : ''}`, pool);
+
+        res.redirect('/admin/pengaturan?msg=' + encodeURIComponent('Pengaturan sekolah berhasil diperbarui'));
+    } catch (err) {
+        logger.error(`POST /admin/pengaturan error: ${err.message}`);
+        if (req.file && req.file.path) {
+            try { fs.unlinkSync(req.file.path); } catch (_) {}
+        }
+        res.redirect('/admin/pengaturan?error=' + encodeURIComponent('Gagal menyimpan pengaturan sekolah'));
+    }
+});
+
+router.post('/pengaturan/reset-logo', async (req, res) => {
+    try {
+        await pengaturanService.resetLogo(pool);
+        await catatAktivitas(req.session.adminId, 'edit', 'pengaturan', null, 'Mereset logo sekolah ke default (SVG)', pool);
+        res.redirect('/admin/pengaturan?msg=' + encodeURIComponent('Logo sekolah berhasil dikembalikan ke default (SVG)'));
+    } catch (err) {
+        logger.error(`POST /admin/pengaturan/reset-logo error: ${err.message}`);
+        res.redirect('/admin/pengaturan?error=' + encodeURIComponent('Gagal mereset logo sekolah'));
+    }
+});
+
 module.exports = router;

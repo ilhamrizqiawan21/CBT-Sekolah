@@ -388,7 +388,7 @@
 <!-- ══ TOPBAR ══ -->
 <div class="exam-topbar">
     <div class="exam-topbar-left">
-        <img src="/images/logo-sekolah.png" alt="Logo" onerror="this.style.display='none'">
+        <img src="<%= typeof logoSekolah !== 'undefined' ? logoSekolah : '/images/default-logo.svg' %>" alt="Logo" onerror="this.src='/images/default-logo.svg'">
         <div class="exam-info-text">
             <div class="exam-name">
                 <i class="bi bi-laptop" style="color:var(--success);margin-right:4px;"></i>

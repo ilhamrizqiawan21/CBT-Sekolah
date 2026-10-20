@@ -137,3 +137,13 @@ CREATE TABLE IF NOT EXISTS log_kecurangan (
   FOREIGN KEY (siswa_id) REFERENCES siswa(id) ON DELETE CASCADE,
   FOREIGN KEY (ujian_id) REFERENCES ujian(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
+
+-- Pengaturan umum aplikasi (identitas & logo sekolah)
+CREATE TABLE IF NOT EXISTS pengaturan (
+  kunci VARCHAR(50) PRIMARY KEY,
+  nilai TEXT NULL
+) ENGINE=InnoDB;
+
+INSERT IGNORE INTO pengaturan (kunci, nilai) VALUES
+  ('nama_sekolah', 'CBT Sekolah'),
+  ('logo_sekolah', '');
